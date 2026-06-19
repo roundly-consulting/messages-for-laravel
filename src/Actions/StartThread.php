@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Actions;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadCreated;
 use RoundlyConsulting\Messages\Models\Thread;
 
@@ -41,10 +42,24 @@ final class StartThread
 
         Event::dispatch(new ThreadCreated($thread));
 
-        foreach ($data->participants as $participant) {
-            $this->addParticipant->execute(new AddParticipantData($thread, $participant));
+        // The first participant is the creator and becomes owner of a group thread.
+        foreach ($data->participants as $index => $participant) {
+            $this->addParticipant->execute(new AddParticipantData(
+                thread: $thread,
+                participant: $participant,
+                role: $this->roleForIndex($data, $index),
+            ));
         }
 
         return $thread;
+    }
+
+    private function roleForIndex(CreateThreadData $data, int $index): ?ParticipantRole
+    {
+        if ($data->isDirect || config('messages.permissions.enabled') !== true) {
+            return null;
+        }
+
+        return $index === 0 ? ParticipantRole::Owner : ParticipantRole::Member;
     }
 }

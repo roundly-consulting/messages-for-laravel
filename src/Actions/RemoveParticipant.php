@@ -12,6 +12,7 @@ use RoundlyConsulting\Messages\Events\ParticipantLeft;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Participant;
+use RoundlyConsulting\Messages\Support\MessagingPermissions;
 
 final class RemoveParticipant
 {
@@ -21,6 +22,11 @@ final class RemoveParticipant
 
     public function execute(AddParticipantData $data): void
     {
+        // Removing someone else requires manage rights; leaving (self) is always allowed.
+        if ($data->actor !== null && ! $this->isSelf($data)) {
+            MessagingPermissions::authorizeManage($data->thread, $data->actor, 'remove participants');
+        }
+
         $participant = $data->thread
             ->participants()
             ->whereMorphedTo('participant', $data->participant)
@@ -37,6 +43,13 @@ final class RemoveParticipant
         Event::dispatch(new ParticipantLeft($data->thread, $data->participant));
 
         $this->maybeSystemMessage($data);
+    }
+
+    private function isSelf(AddParticipantData $data): bool
+    {
+        return $data->actor !== null
+            && $data->actor->getKey() === $data->participant->getKey()
+            && $data->actor->getMorphClass() === $data->participant->getMorphClass();
     }
 
     private function maybeSystemMessage(AddParticipantData $data): void

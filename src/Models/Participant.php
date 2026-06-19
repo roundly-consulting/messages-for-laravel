@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Messages\Database\Factories\ParticipantFactory;
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 
@@ -23,6 +24,7 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property string $thread_id
  * @property string $participant_type
  * @property int|string $participant_id
+ * @property ParticipantRole|null $role
  * @property CarbonInterface|null $read_at
  * @property string|null $last_read_message_id
  * @property CarbonInterface $created_at
@@ -50,6 +52,7 @@ final class Participant extends Model
     {
         return [
             'read_at' => 'datetime',
+            'role' => ParticipantRole::class,
         ];
     }
 

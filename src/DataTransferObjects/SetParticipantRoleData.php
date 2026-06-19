@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Models\Thread;
 
-final readonly class AddParticipantData
+final readonly class SetParticipantRoleData
 {
     public function __construct(
         public Thread $thread,
         public Model $participant,
-        public ?ParticipantRole $role = null,
+        public ParticipantRole $role,
         public ?Model $actor = null,
     ) {}
 }
