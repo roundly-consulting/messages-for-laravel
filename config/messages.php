@@ -18,6 +18,16 @@ return [
         'everyone-can-join' => env('THREADS_EVERYONE_CAN_JOIN', false),
     ],
 
+    'system-messages' => [
+        // When enabled, joins/leaves/renames write a translatable system message.
+        'enabled' => env('MESSAGES_SYSTEM_MESSAGES', false),
+    ],
+
+    'prune' => [
+        // Default retention window (in days) for the messages:prune command.
+        'days' => env('MESSAGES_PRUNE_DAYS', 90),
+    ],
+
     'broadcasting' => [
         'enabled' => env('REALTIME_MESSAGES', false),
 
