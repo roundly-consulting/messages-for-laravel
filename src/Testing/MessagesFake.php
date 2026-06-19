@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Testing;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Assert;
 use RoundlyConsulting\Messages\Builders\PendingMessage;
@@ -39,6 +40,20 @@ final class MessagesFake extends MessagesManager
     public function direct(Model $first, Model $second): Thread
     {
         return $this->manager->direct($first, $second);
+    }
+
+    public function between(Model $first, Model $second): Thread
+    {
+        return $this->manager->between($first, $second);
+    }
+
+    public function inboxFor(
+        Model $participant,
+        int $perPage = 15,
+        int $page = 1,
+        string $pageName = 'page',
+    ): LengthAwarePaginator {
+        return $this->manager->inboxFor($participant, $perPage, $page, $pageName);
     }
 
     public function send(Thread $thread, ?Model $sender, string $body): Message
