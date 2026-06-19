@@ -64,7 +64,10 @@
         "laravel": {
             "providers": [
                 "RoundlyConsulting\\Messages\\MessagesServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "Messages": "RoundlyConsulting\\Messages\\Facades\\Messages"
+            }
         }
     },
     "minimum-stability": "stable",
