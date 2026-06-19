@@ -1,0 +1,129 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RoundlyConsulting\Messages\Concerns;
+
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use RoundlyConsulting\Messages\Actions\AddParticipant;
+use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
+use RoundlyConsulting\Messages\Actions\MarkRead;
+use RoundlyConsulting\Messages\Actions\SendMessage;
+use RoundlyConsulting\Messages\Actions\StartThread;
+use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
+use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
+use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
+use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Models\Participant;
+use RoundlyConsulting\Messages\Models\Thread;
+
+/**
+ * Ergonomic messaging helpers for a participant model.
+ *
+ * The host model must also implement
+ * {@see ParticipatesInMessaging}.
+ *
+ * @mixin Model
+ */
+trait HasMessaging
+{
+    /** @return MorphMany<Participant, $this> */
+    public function participations(): MorphMany
+    {
+        /** @var class-string<Participant> $participant */
+        $participant = config('messages.models.participant', Participant::class);
+
+        return $this->morphMany($participant, 'participant');
+    }
+
+    /**
+     * Threads this model participates in, most-recent activity first.
+     *
+     * @return Collection<int, Thread>
+     */
+    public function threads(): Collection
+    {
+        /** @var class-string<Thread> $model */
+        $model = config('messages.models.thread', Thread::class);
+
+        return $model::query()->forParticipant($this)->get();
+    }
+
+    /**
+     * Start a thread and add this model plus the others as participants.
+     *
+     * @param  Model|iterable<int, Model>  $participants
+     */
+    public function startConversationWith(Model|iterable $participants, ?string $name = null): Thread
+    {
+        $others = $participants instanceof Model
+            ? [$participants]
+            : [...$participants];
+
+        return app(StartThread::class)->execute(new CreateThreadData(
+            name: $name,
+            participants: [$this, ...$others],
+        ));
+    }
+
+    /** Find or create the 1:1 direct thread between this model and the other. */
+    public function conversationWith(Model $other): Thread
+    {
+        return app(FindOrCreateDirectThread::class)->execute($this, $other);
+    }
+
+    public function sendMessageTo(Thread $thread, string $body): Message
+    {
+        return app(SendMessage::class)->execute(new SendMessageData(
+            thread: $thread,
+            sender: $this,
+            body: $body,
+        ));
+    }
+
+    /** Ensure this model is a participant of the given thread. */
+    public function joinThread(Thread $thread): Participant
+    {
+        $existing = $thread->participants()->whereMorphedTo('participant', $this)->first();
+
+        if ($existing instanceof Participant) {
+            return $existing;
+        }
+
+        return app(AddParticipant::class)->execute(new AddParticipantData($thread, $this));
+    }
+
+    /**
+     * Threads with at least one message this model has not read.
+     *
+     * @return Collection<int, Thread>
+     */
+    public function unreadThreads(): Collection
+    {
+        return $this->threads()->filter(
+            fn (Thread $thread): bool => $thread->unreadCountFor($this) > 0,
+        )->values();
+    }
+
+    /** Total unread messages across all threads, or within one thread. */
+    public function unreadCount(?Thread $thread = null): int
+    {
+        if ($thread !== null) {
+            return $thread->unreadCountFor($this);
+        }
+
+        /** @var class-string<Message> $model */
+        $model = config('messages.models.message', Message::class);
+
+        return $model::query()->unreadFor($this)->count();
+    }
+
+    public function markThreadRead(Thread $thread): Participant
+    {
+        return app(MarkRead::class)->execute(new MarkReadData($thread, $this));
+    }
+}
