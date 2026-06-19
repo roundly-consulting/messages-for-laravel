@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Concerns\HasMessaging;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 
-class User extends Model implements ParticipatesInMessaging
+class Company extends Model implements ParticipatesInMessaging
 {
     use HasMessaging;
 

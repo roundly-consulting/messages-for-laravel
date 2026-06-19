@@ -39,5 +39,6 @@ abstract class TestCase extends Orchestra
 
         Schema::create('users', fn (Blueprint $table) => $table->id());
         Schema::create('restaurants', fn (Blueprint $table) => $table->id());
+        Schema::create('companies', fn (Blueprint $table) => $table->id());
     }
 }

@@ -27,4 +27,14 @@ final class ParticipantFactory extends Factory
     {
         return $this->state(fn (): array => ['thread_id' => $thread->getKey()]);
     }
+
+    public function read(): self
+    {
+        return $this->state(fn (): array => ['read_at' => now()]);
+    }
+
+    public function unread(): self
+    {
+        return $this->state(fn (): array => ['read_at' => null]);
+    }
 }
