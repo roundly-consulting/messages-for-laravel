@@ -19,5 +19,6 @@ final readonly class SendMessageData
         public string $body,
         public MessageType $type = MessageType::Text,
         public array $meta = [],
+        public ?string $parentMessageId = null,
     ) {}
 }

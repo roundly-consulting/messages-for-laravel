@@ -17,6 +17,13 @@ final class PendingMessage
 
     private MessageType $type = MessageType::Text;
 
+    private ?string $parentMessageId = null;
+
+    private ?string $systemKey = null;
+
+    /** @var array<string, mixed> */
+    private array $meta = [];
+
     public function __construct(
         private readonly SendMessage $sendMessage,
         private readonly Thread $thread,
@@ -36,13 +43,47 @@ final class PendingMessage
         return $this;
     }
 
-    public function send(string $body): Message
+    public function replyingTo(Message $message): self
     {
+        $this->parentMessageId = (string) $message->getKey();
+
+        return $this;
+    }
+
+    /**
+     * Prepare a translatable system message (sent without a sender on ->send()).
+     *
+     * @param  array<string, scalar>  $params
+     */
+    public function asSystem(string $key, array $params = []): self
+    {
+        $this->type = MessageType::System;
+        $this->systemKey = $key;
+        $this->sender = null;
+        $this->meta = [...$this->meta, ...$params];
+
+        return $this;
+    }
+
+    /** @param  array<string, mixed>  $meta */
+    public function withMeta(array $meta): self
+    {
+        $this->meta = [...$this->meta, ...$meta];
+
+        return $this;
+    }
+
+    public function send(?string $body = null): Message
+    {
+        $resolvedBody = $body ?? $this->systemKey;
+
         return $this->sendMessage->execute(new SendMessageData(
             thread: $this->thread,
             sender: $this->sender,
-            body: $body,
+            body: $resolvedBody ?? '',
             type: $this->type,
+            meta: $this->meta,
+            parentMessageId: $this->parentMessageId,
         ));
     }
 }
