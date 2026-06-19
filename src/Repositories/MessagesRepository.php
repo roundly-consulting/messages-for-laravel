@@ -6,22 +6,24 @@ namespace RoundlyConsulting\Messages\Repositories;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Messages\Actions\SendMessage;
+use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 
 final class MessagesRepository
 {
+    public function __construct(
+        private readonly SendMessage $sendMessage,
+    ) {}
+
     public function sendMessage(Thread $thread, Model $sender, string $message): Message
     {
-        $created = $thread->messages()->create([
-            'sender_id' => $sender->getKey(),
-            'sender_type' => $sender->getMorphClass(),
-            'message' => $message,
-        ]);
-
-        $thread->touch('last_activity_at');
-
-        return $created;
+        return $this->sendMessage->execute(new SendMessageData(
+            thread: $thread,
+            sender: $sender,
+            body: $message,
+        ));
     }
 
     /**

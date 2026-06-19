@@ -7,10 +7,16 @@ namespace RoundlyConsulting\Messages\Repositories;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Messages\Actions\StartThread;
+use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Models\Thread;
 
 final class ThreadsRepository
 {
+    public function __construct(
+        private readonly StartThread $startThread,
+    ) {}
+
     /**
      * @return LengthAwarePaginator<int, Thread>
      */
@@ -47,25 +53,18 @@ final class ThreadsRepository
 
     public function create(string $name, ?bool $isPublic = null, ?bool $everyoneCanJoin = null): Thread
     {
-        $isPublic ??= (bool) config('messages.publicity.public-by-default', false);
-        $everyoneCanJoin ??= (bool) config('messages.publicity.everyone-can-join', false);
-
-        return tap($this->newModelInstance([
-            'name' => $name,
-            'is_public' => $isPublic,
-            'everyone_can_join' => $everyoneCanJoin,
-            'last_activity_at' => now(),
-        ]), fn (Thread $thread): bool => $thread->save());
+        return $this->startThread->execute(new CreateThreadData(
+            name: $name,
+            isPublic: $isPublic,
+            everyoneCanJoin: $everyoneCanJoin,
+        ));
     }
 
-    /**
-     * @param  array<string, mixed>  $attributes
-     */
-    private function newModelInstance(array $attributes = []): Thread
+    private function newModelInstance(): Thread
     {
         /** @var class-string<Thread> $thread */
         $thread = config('messages.models.thread', Thread::class);
 
-        return new $thread($attributes);
+        return new $thread;
     }
 }
