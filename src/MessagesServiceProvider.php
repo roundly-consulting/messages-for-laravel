@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Messages\Commands\PruneMessagesCommand;
+use RoundlyConsulting\Messages\Events\MessageSent;
+use RoundlyConsulting\Messages\Listeners\NotifyParticipantsOfNewMessage;
 
 final class MessagesServiceProvider extends ServiceProvider
 {
@@ -20,6 +23,8 @@ final class MessagesServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'messages');
+
+        Event::listen(MessageSent::class, NotifyParticipantsOfNewMessage::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -37,6 +42,14 @@ final class MessagesServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/lang' => $this->app->langPath('vendor/messages'),
             ], 'messages-translations');
+
+            $this->publishes([
+                __DIR__.'/../src/Http/Resources' => app_path('Http/Resources/Messages'),
+            ], 'messages-resources');
+
+            $this->publishes([
+                __DIR__.'/../src/Notifications' => app_path('Notifications/Messages'),
+            ], 'messages-notifications');
         }
     }
 }
