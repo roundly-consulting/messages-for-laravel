@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
 use RoundlyConsulting\Messages\Actions\MarkRead;
@@ -39,6 +40,32 @@ class MessagesManager
     public function direct(Model $first, Model $second): Thread
     {
         return $this->findOrCreateDirectThread->execute($first, $second);
+    }
+
+    /** Find or create the direct (1:1) thread between two participants. */
+    public function between(Model $first, Model $second): Thread
+    {
+        return $this->findOrCreateDirectThread->execute($first, $second);
+    }
+
+    /**
+     * The participant's threads as an optimised inbox: newest activity first, with the
+     * latest message, participants, and per-thread unread counts eager loaded.
+     *
+     * @return LengthAwarePaginator<int, Thread>
+     */
+    public function inboxFor(
+        Model $participant,
+        int $perPage = 15,
+        int $page = 1,
+        string $pageName = 'page',
+    ): LengthAwarePaginator {
+        /** @var class-string<Thread> $model */
+        $model = config('messages.models.thread', Thread::class);
+
+        return $model::query()
+            ->inboxFor($participant)
+            ->paginate(perPage: $perPage, pageName: $pageName, page: $page);
     }
 
     public function send(Thread $thread, ?Model $sender, string $body): Message

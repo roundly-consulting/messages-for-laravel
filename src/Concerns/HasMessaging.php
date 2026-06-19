@@ -54,6 +54,17 @@ trait HasMessaging
     }
 
     /**
+     * Threads this model participates in, most-recent activity first. Alias of
+     * {@see threads()} with a chat-inbox name.
+     *
+     * @return Collection<int, Thread>
+     */
+    public function conversations(): Collection
+    {
+        return $this->threads();
+    }
+
+    /**
      * Start a thread and add this model plus the others as participants.
      *
      * @param  Model|iterable<int, Model>  $participants

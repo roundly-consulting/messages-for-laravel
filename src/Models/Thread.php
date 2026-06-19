@@ -16,7 +16,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection as SupportCollection;
+use RoundlyConsulting\Messages\Actions\MarkRead;
 use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
+use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
+use RoundlyConsulting\Messages\Events\ParticipantTyping;
+use RoundlyConsulting\Messages\Support\MessagingPermissions;
 
 /**
  * @property string $id
@@ -25,9 +32,11 @@ use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
  * @property bool $is_public
  * @property bool $everyone_can_join
  * @property CarbonInterface $last_activity_at
+ * @property CarbonInterface|null $archived_at
  * @property CarbonInterface $created_at
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
+ * @property int|null $unread_count
  * @property-read Collection<int, Participant> $participants
  * @property-read Collection<int, Message> $messages
  * @property-read Message|null $latestMessage
@@ -54,7 +63,13 @@ final class Thread extends Model
             'is_public' => 'bool',
             'everyone_can_join' => 'bool',
             'last_activity_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
     }
 
     /**
@@ -93,6 +108,38 @@ final class Thread extends Model
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $second))
             // Exactly the two of them — no third participant turns the DM into a group.
             ->has('participants', '=', 2);
+    }
+
+    /**
+     * Optimised inbox query: the participant's threads, newest activity first, with the
+     * latest message (+ its sender), participants, and a per-thread unread count eager
+     * loaded so a chat inbox renders without N+1 queries.
+     *
+     * @param  Builder<Thread>  $query
+     * @return Builder<Thread>
+     */
+    public function scopeInboxFor(Builder $query, Model $participant): Builder
+    {
+        return $query
+            ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $participant))
+            ->with(['latestMessage.sender', 'participants.participant'])
+            ->withCount([
+                'messages as unread_count' => fn (Builder $q): Builder => self::applyUnreadFor($q, $participant),
+            ])
+            ->latest('last_activity_at')
+            ->withCasts(['unread_count' => 'integer']);
+    }
+
+    /**
+     * Apply the unread-messages scope, narrowing the loosely-typed relation
+     * builder to {@see Message} so {@see Message::scopeUnreadFor()} resolves.
+     *
+     * @param  Builder<Message>  $query
+     * @return Builder<Message>
+     */
+    private static function applyUnreadFor(Builder $query, Model $participant): Builder
+    {
+        return $query->unreadFor($participant);
     }
 
     protected static function newFactory(): ThreadFactory
@@ -149,6 +196,83 @@ final class Thread extends Model
             ->where('thread_id', $this->getKey())
             ->unreadFor($participant)
             ->count();
+    }
+
+    /** The role the given model holds in this thread, or null if not a participant. */
+    public function roleOf(Model $participant): ?ParticipantRole
+    {
+        $row = $this->participantRecordFor($participant);
+
+        return $row?->role;
+    }
+
+    /** Whether the given participant may manage this thread (owner/admin on a group thread). */
+    public function canManage(Model $participant): bool
+    {
+        return MessagingPermissions::canManage($this, $participant);
+    }
+
+    public function markReadFor(Model $participant): Participant
+    {
+        return app(MarkRead::class)->execute(
+            new MarkReadData($this, $participant),
+        );
+    }
+
+    /**
+     * Participants (except the sender) that can receive Laravel notifications.
+     *
+     * @return SupportCollection<int, Model>
+     */
+    public function notifiableParticipants(?Model $exceptSender = null): SupportCollection
+    {
+        return $this->participants()
+            ->with('participant')
+            ->get()
+            ->map(fn (Participant $p): ?Model => $p->participant)
+            ->filter(fn (?Model $model): bool => $model instanceof Model
+                && in_array(Notifiable::class, class_uses_recursive($model), true)
+                && ! ($exceptSender !== null
+                    && $model->getKey() === $exceptSender->getKey()
+                    && $model->getMorphClass() === $exceptSender->getMorphClass()))
+            ->values();
+    }
+
+    /** Broadcast a transient "is typing" signal. Never persisted; respects broadcasting.enabled. */
+    public function typing(Model $participant): void
+    {
+        if (config('messages.broadcasting.enabled') !== true) {
+            return;
+        }
+
+        ParticipantTyping::dispatch($this, $participant);
+    }
+
+    /** A short, type-aware preview of the most recent message. */
+    public function latestMessagePreview(): ?string
+    {
+        $latest = $this->relationLoaded('latestMessage')
+            ? $this->latestMessage
+            : $this->latestMessage()->first();
+
+        if (! $latest instanceof Message) {
+            return null;
+        }
+
+        return $latest->preview();
+    }
+
+    private function participantRecordFor(Model $participant): ?Participant
+    {
+        if ($this->relationLoaded('participants')) {
+            return $this->participants
+                ->first(fn (Participant $p): bool => $p->participant_id == $participant->getKey()
+                    && $p->participant_type === $participant->getMorphClass());
+        }
+
+        return $this->participants()
+            ->whereMorphedTo('participant', $participant)
+            ->first();
     }
 
     /**

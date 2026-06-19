@@ -8,13 +8,16 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
@@ -23,6 +26,7 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 /**
  * @property string $id
  * @property string $thread_id
+ * @property string|null $parent_message_id
  * @property string|null $sender_type
  * @property int|string|null $sender_id
  * @property string $message
@@ -33,6 +37,8 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property CarbonInterface|null $deleted_at
  * @property-read Model|null $sender
  * @property-read Model $thread
+ * @property-read Message|null $parent
+ * @property-read Collection<int, Message> $replies
  */
 final class Message extends Model
 {
@@ -75,6 +81,73 @@ final class Message extends Model
     public function sender(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /** @return BelongsTo<Message, $this> */
+    public function parent(): BelongsTo
+    {
+        /** @var class-string<Message> $message */
+        $message = config('messages.models.message', self::class);
+
+        return $this->belongsTo($message, 'parent_message_id');
+    }
+
+    /** @return HasMany<Message, $this> */
+    public function replies(): HasMany
+    {
+        /** @var class-string<Message> $message */
+        $message = config('messages.models.message', self::class);
+
+        return $this->hasMany($message, 'parent_message_id');
+    }
+
+    /** Whether the given participant has read up to (at least) this message. */
+    public function isReadBy(Model $participant): bool
+    {
+        /** @var class-string<Participant> $participantModel */
+        $participantModel = config('messages.models.participant', Participant::class);
+
+        return $participantModel::query()
+            ->where('thread_id', $this->thread_id)
+            ->whereMorphedTo('participant', $participant)
+            ->whereNotNull('read_at')
+            ->where('read_at', '>=', $this->created_at)
+            ->exists();
+    }
+
+    /** A short, type-aware, truncated preview suitable for an inbox list. */
+    public function preview(): string
+    {
+        $length = (int) config('messages.preview.length', 120);
+
+        if ($this->type === MessageType::System) {
+            $rendered = trans($this->message, $this->systemReplacements());
+
+            return Str::limit(is_string($rendered) ? $rendered : $this->message, $length);
+        }
+
+        if ($this->deleted_at !== null) {
+            $deleted = trans('messages::messages.preview.deleted');
+
+            return is_string($deleted) ? $deleted : '';
+        }
+
+        return Str::limit($this->message, $length);
+    }
+
+    /** @return array<string, mixed> */
+    private function systemReplacements(): array
+    {
+        $meta = $this->meta ?? [];
+        $replacements = [];
+
+        foreach ($meta as $key => $value) {
+            if (is_scalar($value)) {
+                $replacements[$key] = $value;
+            }
+        }
+
+        return $replacements;
     }
 
     /**

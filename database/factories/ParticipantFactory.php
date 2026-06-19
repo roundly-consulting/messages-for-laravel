@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 
@@ -19,8 +20,19 @@ final class ParticipantFactory extends Factory
             'thread_id' => ThreadFactory::new(),
             'participant_type' => 'user',
             'participant_id' => $this->faker->randomNumber(),
+            'role' => null,
             'read_at' => null,
         ];
+    }
+
+    public function role(ParticipantRole $role): self
+    {
+        return $this->state(fn (): array => ['role' => $role]);
+    }
+
+    public function owner(): self
+    {
+        return $this->role(ParticipantRole::Owner);
     }
 
     public function inThread(Thread $thread): self
