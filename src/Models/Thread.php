@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,7 +20,8 @@ use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
 
 /**
  * @property string $id
- * @property string $name
+ * @property string|null $name
+ * @property bool $is_direct
  * @property bool $is_public
  * @property bool $everyone_can_join
  * @property CarbonInterface $last_activity_at
@@ -36,6 +38,7 @@ final class Thread extends Model
 
     /** @use HasFactory<ThreadFactory> */
     use HasFactory;
+
     use HasUuids;
     use SoftDeletes;
 
@@ -47,10 +50,49 @@ final class Thread extends Model
     protected function casts(): array
     {
         return [
+            'is_direct' => 'bool',
             'is_public' => 'bool',
             'everyone_can_join' => 'bool',
             'last_activity_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @param  Builder<Thread>  $query
+     * @return Builder<Thread>
+     */
+    public function scopeDirect(Builder $query): Builder
+    {
+        return $query->where('is_direct', true);
+    }
+
+    /**
+     * Threads the given participant belongs to, most-recent activity first.
+     *
+     * @param  Builder<Thread>  $query
+     * @return Builder<Thread>
+     */
+    public function scopeForParticipant(Builder $query, Model $participant): Builder
+    {
+        return $query
+            ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $participant))
+            ->latest('last_activity_at');
+    }
+
+    /**
+     * Direct threads whose participant set is exactly the two given models.
+     *
+     * @param  Builder<Thread>  $query
+     * @return Builder<Thread>
+     */
+    public function scopeBetween(Builder $query, Model $first, Model $second): Builder
+    {
+        return $query
+            ->where('is_direct', true)
+            ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $first))
+            ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $second))
+            // Exactly the two of them — no third participant turns the DM into a group.
+            ->has('participants', '=', 2);
     }
 
     protected static function newFactory(): ThreadFactory
@@ -83,6 +125,30 @@ final class Thread extends Model
         $message = config('messages.models.message', Message::class);
 
         return $this->hasOne($message)->latestOfMany();
+    }
+
+    /**
+     * Participants who have read this thread up to (at least) the given message.
+     *
+     * @return Collection<int, Participant>
+     */
+    public function seenBy(Message $message): Collection
+    {
+        return $this->participants()
+            ->whereNotNull('read_at')
+            ->where('read_at', '>=', $message->created_at)
+            ->get();
+    }
+
+    public function unreadCountFor(Model $participant): int
+    {
+        /** @var class-string<Message> $message */
+        $message = config('messages.models.message', Message::class);
+
+        return $message::query()
+            ->where('thread_id', $this->getKey())
+            ->unreadFor($participant)
+            ->count();
     }
 
     /**

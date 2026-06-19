@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Models;
 use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,11 +24,12 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property string $participant_type
  * @property int|string $participant_id
  * @property CarbonInterface|null $read_at
+ * @property string|null $last_read_message_id
  * @property CarbonInterface $created_at
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  * @property-read Model|null $participant
- * @property-read Model $thread
+ * @property-read Thread $thread
  */
 final class Participant extends Model
 {
@@ -54,6 +56,40 @@ final class Participant extends Model
     protected static function newFactory(): ParticipantFactory
     {
         return ParticipantFactory::new();
+    }
+
+    /**
+     * Participants who have never read their thread.
+     *
+     * @param  Builder<Participant>  $query
+     * @return Builder<Participant>
+     */
+    public function scopeUnread(Builder $query): Builder
+    {
+        return $query->whereNull('read_at');
+    }
+
+    public function markAsRead(): self
+    {
+        $latest = $this->thread->latestMessage()->first();
+
+        $this->forceFill([
+            'read_at' => now(),
+            'last_read_message_id' => $latest?->getKey(),
+        ])->save();
+
+        return $this;
+    }
+
+    public function hasUnread(): bool
+    {
+        $participant = $this->participant;
+
+        if (! $participant instanceof Model) {
+            return false;
+        }
+
+        return $this->thread->unreadCountFor($participant) > 0;
     }
 
     /** @return BelongsTo<Model, $this> */

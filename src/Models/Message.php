@@ -7,13 +7,16 @@ namespace RoundlyConsulting\Messages\Models;
 use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
+use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 
@@ -23,6 +26,8 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property string|null $sender_type
  * @property int|string|null $sender_id
  * @property string $message
+ * @property MessageType $type
+ * @property array<string, mixed>|null $meta
  * @property CarbonInterface $created_at
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
@@ -43,6 +48,15 @@ final class Message extends Model
 
     protected $guarded = [];
 
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'type' => MessageType::class,
+            'meta' => 'array',
+        ];
+    }
+
     protected static function newFactory(): MessageFactory
     {
         return MessageFactory::new();
@@ -61,6 +75,40 @@ final class Message extends Model
     public function sender(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Messages in the participant's threads that they have not yet read.
+     *
+     * A message is unread when it was created after the participant's last read
+     * pointer (or they have never read the thread) and they are not its sender.
+     *
+     * @param  Builder<Message>  $query
+     * @return Builder<Message>
+     */
+    public function scopeUnreadFor(Builder $query, Model $participant): Builder
+    {
+        /** @var class-string<Participant> $participantModel */
+        $participantModel = config('messages.models.participant', Participant::class);
+        $table = (new $participantModel)->getTable();
+
+        return $query
+            // Not authored by the participant.
+            ->where(fn (Builder $q): Builder => $q
+                ->whereNull('sender_id')
+                ->orWhere('sender_id', '!=', $participant->getKey())
+                ->orWhere('sender_type', '!=', $participant->getMorphClass()))
+            // Newer than the participant's read pointer in this thread.
+            ->whereExists(fn (QueryBuilder $sub): QueryBuilder => $sub
+                ->selectRaw('1')
+                ->from($table)
+                ->whereColumn($table.'.thread_id', 'messaging_messages.thread_id')
+                ->where($table.'.participant_id', $participant->getKey())
+                ->where($table.'.participant_type', $participant->getMorphClass())
+                ->whereNull($table.'.deleted_at')
+                ->where(fn (QueryBuilder $pointer): QueryBuilder => $pointer
+                    ->whereNull($table.'.read_at')
+                    ->orWhereColumn($table.'.read_at', '<', 'messaging_messages.created_at')));
     }
 
     /**
