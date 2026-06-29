@@ -154,6 +154,96 @@ $reply->meta['quote']; // ['id', 'sender_id', 'sender_type', 'excerpt'] snapshot
 
 Replying to a message in a different thread throws a `MessageException`.
 
+## Attachments
+
+> Integrates with [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel).
+> See the org-wide [cross-package integration plan](https://github.com/roundly-consulting) for how
+> the packages compose.
+
+Messages carry first-class file attachments backed by media-library. Each message owns a private
+`attachments` bucket: images get a responsive width ladder, any other file type (PDF, zip, …) is
+stored as a passthrough original. Attachments are **private by default** and reachable only through
+media-library's signed, short-lived streaming URLs — regardless of whether the thread is public.
+
+media-library is a hard dependency, so there is nothing to opt into; install it alongside messages
+and configure a disk:
+
+```bash
+composer require roundly-consulting/messages-for-laravel
+php artisan vendor:publish --tag="media-config"   # set the attachments disk + streaming route
+php artisan migrate                                # creates the `media` table
+```
+
+### Sending with attachments
+
+The message builder accepts both pre-uploaded **draft media tokens** and freshly **uploaded
+files**. Both are bound to the message inside `SendMessage` — in a transaction, before
+`MessageSent` fires — so listeners, broadcasts, and recipients see the attachments immediately. A
+bad/expired draft token aborts the whole send (no orphan message).
+
+```php
+use RoundlyConsulting\Messages\Facades\Messages;
+
+$message = Messages::to($thread)->from($alice)
+    ->withAttachment($draftToken)                 // a media-library draft token
+    ->withAttachments([$tokenA, $tokenB])         // several at once
+    ->attach($request->file('photo'))             // an UploadedFile
+    ->send('Here are the files');
+```
+
+You can also attach directly to a persisted message via media-library's fluent adder:
+
+```php
+$message->addMedia($uploadedFile)->toMediaBucket('attachments');
+```
+
+### Reading attachments
+
+```php
+$message->attachments();        // Collection<Media> — every attachment
+$message->imageAttachments();   // images only
+$message->fileAttachments();    // non-image (passthrough) files
+$message->hasAttachments();     // bool
+```
+
+### Private, signed URLs
+
+```php
+$media = $message->imageAttachments()->first();
+
+$message->attachmentUrl($media);                  // signed, short-lived stream URL
+$message->attachmentDownloadUrl($media);          // forces a download (attachment)
+$message->attachmentPreviewUrl($media, 'responsive-640'); // a variant preview (images only)
+```
+
+`attachmentPreviewUrl()` throws a `MessageException` for a non-image attachment. Responsive
+`srcset()` over private media needs a signed URL per candidate width, so use it only when the
+bucket is configured public.
+
+### Variants & cleanup
+
+When a message is sent, a queued `WarmMessageMediaVariants` listener dispatches media-library's
+`GenerateVariantsJob` for each image attachment, so previews are ready when the message lands.
+Force-deleting a message (hard delete / prune) removes its attachment files; soft-deleting
+(unsending) a message keeps them.
+
+### Configuration
+
+```php
+// config/messages.php
+'media' => [
+    'attachments_bucket'      => 'attachments', // media-library bucket name
+    'disk'                    => env('MESSAGES_MEDIA_DISK', null),       // null = media default disk
+    'visibility'              => env('MESSAGES_MEDIA_VISIBILITY', 'private'), // 'private' | 'public'
+    'accepted_mime_types'     => [],            // [] = accept any file
+    'max_file_size'           => null,          // bytes; null = media default
+    'responsive_widths'       => null,          // null = media default ladder
+    'warm_on_send'            => true,          // queue variant generation on send
+    'temporary_url_lifetime'  => null,          // minutes; null = media default
+    'cleanup_on_force_delete' => true,          // remove files on hard delete / prune
+],
+```
+
 ## Notifications
 
 Opt in to bridge new messages to Laravel notifications. When enabled, every sent message
