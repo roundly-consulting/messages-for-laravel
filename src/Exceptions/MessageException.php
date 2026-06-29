@@ -22,4 +22,9 @@ final class MessageException extends Exception
 
         return new self(is_string($message) ? $message : 'A reply must target a message in the same thread.');
     }
+
+    public static function attachmentIsNotAnImage(): self
+    {
+        return new self('A preview URL can only be generated for an image attachment.');
+    }
 }

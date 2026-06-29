@@ -19,6 +19,37 @@ return [
         'everyone-can-join' => env('THREADS_EVERYONE_CAN_JOIN', false),
     ],
 
+    'media' => [
+        // The media-library bucket message attachments are stored in.
+        'attachments_bucket' => 'attachments',
+
+        // Disk for attachment originals. null = media-library's default disk.
+        'disk' => env('MESSAGES_MEDIA_DISK', null),
+
+        // Attachments are private by default and reachable only through media's signed
+        // streaming route. Set to 'public' to expose direct URLs (not recommended for DMs).
+        'visibility' => env('MESSAGES_MEDIA_VISIBILITY', 'private'),
+
+        // Allowed mime types. [] = accept any file (images and non-images alike).
+        'accepted_mime_types' => [],
+
+        // Maximum accepted attachment size in bytes. null = media-library's default.
+        'max_file_size' => null,
+
+        // Responsive width ladder for image attachments. null = media-library's default ladder.
+        'responsive_widths' => null,
+
+        // Queue a GenerateVariantsJob for each image attachment when a message is sent.
+        'warm_on_send' => true,
+
+        // Lifetime (in minutes) of the signed attachment URLs. null = media-library's default.
+        'temporary_url_lifetime' => null,
+
+        // Remove attachment files when a message is force-deleted (hard delete / prune).
+        // Soft-deleted (unsent) messages always keep their files.
+        'cleanup_on_force_delete' => true,
+    ],
+
     'system-messages' => [
         // When enabled, joins/leaves/renames write a translatable system message.
         'enabled' => env('MESSAGES_SYSTEM_MESSAGES', false),

@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Messages\Commands\PruneMessagesCommand;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Listeners\NotifyParticipantsOfNewMessage;
+use RoundlyConsulting\Messages\Listeners\WarmMessageMediaVariants;
 
 final class MessagesServiceProvider extends ServiceProvider
 {
@@ -25,6 +26,7 @@ final class MessagesServiceProvider extends ServiceProvider
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'messages');
 
         Event::listen(MessageSent::class, NotifyParticipantsOfNewMessage::class);
+        Event::listen(MessageSent::class, WarmMessageMediaVariants::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

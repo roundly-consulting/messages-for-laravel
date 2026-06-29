@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Builders;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\MessageType;
@@ -23,6 +24,12 @@ final class PendingMessage
 
     /** @var array<string, mixed> */
     private array $meta = [];
+
+    /** @var list<string> */
+    private array $attachments = [];
+
+    /** @var list<UploadedFile> */
+    private array $uploads = [];
 
     public function __construct(
         private readonly SendMessage $sendMessage,
@@ -73,6 +80,34 @@ final class PendingMessage
         return $this;
     }
 
+    /** Bind a previously-uploaded draft media (by its token) to the message's attachments bucket. */
+    public function withAttachment(string $token): self
+    {
+        $this->attachments[] = $token;
+
+        return $this;
+    }
+
+    /**
+     * Bind several draft media tokens to the message's attachments bucket.
+     *
+     * @param  list<string>  $tokens
+     */
+    public function withAttachments(array $tokens): self
+    {
+        $this->attachments = [...$this->attachments, ...$tokens];
+
+        return $this;
+    }
+
+    /** Attach an uploaded file to the message's attachments bucket. */
+    public function attach(UploadedFile $file): self
+    {
+        $this->uploads[] = $file;
+
+        return $this;
+    }
+
     public function send(?string $body = null): Message
     {
         $resolvedBody = $body ?? $this->systemKey;
@@ -84,6 +119,8 @@ final class PendingMessage
             type: $this->type,
             meta: $this->meta,
             parentMessageId: $this->parentMessageId,
+            attachments: $this->attachments,
+            uploads: $this->uploads,
         ));
     }
 }

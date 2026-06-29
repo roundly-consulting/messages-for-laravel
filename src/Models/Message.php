@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
+use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\Messages\Concerns\HasMessageMedia;
 use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
@@ -40,19 +42,32 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property-read Message|null $parent
  * @property-read Collection<int, Message> $replies
  */
-final class Message extends Model
+final class Message extends Model implements HasMedia
 {
     use BroadcastsEvents;
 
     /** @use HasFactory<MessageFactory> */
     use HasFactory;
 
+    use HasMessageMedia;
     use HasUuids;
     use SoftDeletes;
 
     protected $table = 'messaging_messages';
 
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        // Force-deleting (hard delete / prune) a message clears its attachment files; soft
+        // deletes keep them. Bulk force-deletes (PruneMessages) skip model events, so the prune
+        // action clears attachments in its own loop.
+        self::forceDeleted(static function (Message $message): void {
+            if ((bool) config('messages.media.cleanup_on_force_delete', true)) {
+                $message->clearMediaBucket($message->attachmentsBucket());
+            }
+        });
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

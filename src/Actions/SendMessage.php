@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Actions;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
@@ -21,21 +22,51 @@ final class SendMessage
             $meta = $this->withQuoteSnapshot($data, $meta);
         }
 
-        /** @var Message $message */
-        $message = $data->thread->messages()->create([
-            'parent_message_id' => $data->parentMessageId,
-            'sender_id' => $data->sender?->getKey(),
-            'sender_type' => $data->sender?->getMorphClass(),
-            'message' => $data->body,
-            'type' => $data->type,
-            'meta' => $meta === [] ? null : $meta,
-        ]);
+        // Create the message and bind its attachments atomically: a bad draft token (or any
+        // attachment failure) rolls the whole send back, so no bodyless/orphan message is left.
+        $message = DB::transaction(function () use ($data, $meta): Message {
+            /** @var Message $message */
+            $message = $data->thread->messages()->create([
+                'parent_message_id' => $data->parentMessageId,
+                'sender_id' => $data->sender?->getKey(),
+                'sender_type' => $data->sender?->getMorphClass(),
+                'message' => $data->body,
+                'type' => $data->type,
+                'meta' => $meta === [] ? null : $meta,
+            ]);
 
-        $data->thread->touch('last_activity_at');
+            $this->bindAttachments($message, $data);
 
+            $data->thread->touch('last_activity_at');
+
+            return $message;
+        });
+
+        // Dispatch after commit so listeners, broadcasts, and recipients see the attachments.
         Event::dispatch(new MessageSent($message));
 
         return $message;
+    }
+
+    /**
+     * Bind draft media tokens and uploaded files to the message's attachments bucket before the
+     * MessageSent event fires.
+     */
+    private function bindAttachments(Message $message, SendMessageData $data): void
+    {
+        if ($data->attachments === [] && $data->uploads === []) {
+            return;
+        }
+
+        $bucket = $message->attachmentsBucket();
+
+        foreach ($data->attachments as $token) {
+            $message->attachDraftMedia($token, $bucket);
+        }
+
+        foreach ($data->uploads as $upload) {
+            $message->addMedia($upload)->toMediaBucket($bucket);
+        }
     }
 
     /**
