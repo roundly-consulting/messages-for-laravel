@@ -3,6 +3,9 @@ name: Fix PHP code style issues
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   php-code-styling:
     runs-on: ubuntu-latest
@@ -19,4 +22,4 @@ jobs:
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          commit_message: "style: fix code style"
+          commit_message: "style(pint): fix code style"
