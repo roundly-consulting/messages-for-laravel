@@ -20,6 +20,18 @@
     "repositories": [
         {
             "type": "path",
+            "url": "../enums-for-laravel*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/roundly-consulting/enums-for-laravel",
+            "no-api": true
+        },
+        {
+            "type": "path",
             "url": "../media-library-for-laravel*",
             "options": {
                 "symlink": true
@@ -36,6 +48,7 @@
         "illuminate/broadcasting": "^12.0|^13.0",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/notifications": "^12.0|^13.0",
+        "roundly-consulting/enums-for-laravel": "@dev",
         "roundly-consulting/media-library-for-laravel": "@dev"
     },
     "require-dev": {
