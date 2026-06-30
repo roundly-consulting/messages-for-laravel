@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Enums;
 
+use RoundlyConsulting\Enums\Helpers;
+
 enum ParticipantRole: string
 {
+    use Helpers;
+
     case Owner = 'owner';
     case Admin = 'admin';
     case Member = 'member';

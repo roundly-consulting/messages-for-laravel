@@ -137,6 +137,27 @@ app(ArchiveThread::class)->execute($thread, $alice);
 $thread->isArchived();   // true
 ```
 
+### Enum helpers
+
+> Integrates with [`enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel).
+
+`ParticipantRole` and `MessageType` adopt the `RoundlyConsulting\Enums\Helpers` trait, so both
+expose readable labels, select-ready option lists, and a drift-proof validation rule alongside
+their domain methods (`canManage()`, `outranks()`, …):
+
+```php
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
+
+ParticipantRole::labels();          // ['Owner', 'Admin', 'Member']
+ParticipantRole::toOptions();       // ['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member']
+ParticipantRole::options();         // Collection<EnumOption{ value, label, name }> for JS/Inertia selects
+ParticipantRole::validationRule();  // 'in:owner,admin,member'
+ParticipantRole::Owner->label();    // 'Owner'
+```
+
+enums-for-laravel is a hard dependency (Tier 0), so the helpers are always available — there is
+nothing to install or configure separately. See [`docs/cross-package-integration-plan.md`](https://github.com/roundly-consulting/docs) for the tier DAG.
+
 ## Replies & quoting
 
 Any message can reply to another in the same thread. A lightweight snapshot of the quoted
