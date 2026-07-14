@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Actions\StartThread;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 final class ThreadsRepository
 {
@@ -62,9 +63,6 @@ final class ThreadsRepository
 
     private function newModelInstance(): Thread
     {
-        /** @var class-string<Thread> $thread */
-        $thread = config('messages.models.thread', Thread::class);
-
-        return new $thread;
+        return ThreadModel::new();
     }
 }

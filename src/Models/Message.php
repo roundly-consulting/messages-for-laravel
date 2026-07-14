@@ -24,6 +24,9 @@ use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\ParticipantModel;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
  * @property string $id
@@ -38,11 +41,13 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  * @property-read Model|null $sender
- * @property-read Model $thread
+ * @property-read Thread|null $thread
  * @property-read Message|null $parent
  * @property-read Collection<int, Message> $replies
+ *
+ * Not final: `messages.models.message` documents swapping in a host subclass.
  */
-final class Message extends Model implements HasMedia
+class Message extends Model implements HasMedia
 {
     use BroadcastsEvents;
 
@@ -62,7 +67,7 @@ final class Message extends Model implements HasMedia
         // Force-deleting (hard delete / prune) a message clears its attachment files; soft
         // deletes keep them. Bulk force-deletes (PruneMessages) skip model events, so the prune
         // action clears attachments in its own loop.
-        self::forceDeleted(static function (Message $message): void {
+        static::forceDeleted(static function (Message $message): void {
             if ((bool) config('messages.media.cleanup_on_force_delete', true)) {
                 $message->clearMediaBucket($message->attachmentsBucket());
             }
@@ -83,13 +88,10 @@ final class Message extends Model implements HasMedia
         return MessageFactory::new();
     }
 
-    /** @return BelongsTo<Model, $this> */
+    /** @return BelongsTo<Thread, $this> */
     public function thread(): BelongsTo
     {
-        /** @var class-string<Model> $thread */
-        $thread = config('messages.models.thread', Thread::class);
-
-        return $this->belongsTo($thread);
+        return $this->belongsTo(ThreadModel::class(), 'thread_id');
     }
 
     /** @return MorphTo<Model, $this> */
@@ -101,26 +103,19 @@ final class Message extends Model implements HasMedia
     /** @return BelongsTo<Message, $this> */
     public function parent(): BelongsTo
     {
-        /** @var class-string<Message> $message */
-        $message = config('messages.models.message', self::class);
-
-        return $this->belongsTo($message, 'parent_message_id');
+        return $this->belongsTo(MessageModel::class(), 'parent_message_id');
     }
 
     /** @return HasMany<Message, $this> */
     public function replies(): HasMany
     {
-        /** @var class-string<Message> $message */
-        $message = config('messages.models.message', self::class);
-
-        return $this->hasMany($message, 'parent_message_id');
+        return $this->hasMany(MessageModel::class(), 'parent_message_id');
     }
 
     /** Whether the given participant has read up to (at least) this message. */
     public function isReadBy(Model $participant): bool
     {
-        /** @var class-string<Participant> $participantModel */
-        $participantModel = config('messages.models.participant', Participant::class);
+        $participantModel = ParticipantModel::class();
 
         return $participantModel::query()
             ->where('thread_id', $this->thread_id)
@@ -176,9 +171,7 @@ final class Message extends Model implements HasMedia
      */
     public function scopeUnreadFor(Builder $query, Model $participant): Builder
     {
-        /** @var class-string<Participant> $participantModel */
-        $participantModel = config('messages.models.participant', Participant::class);
-        $table = (new $participantModel)->getTable();
+        $table = ParticipantModel::new()->getTable();
 
         return $query
             // Not authored by the participant.

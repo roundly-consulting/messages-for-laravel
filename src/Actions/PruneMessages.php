@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Actions;
 use Illuminate\Database\Eloquent\Builder;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Support\MessageModel;
 
 final class PruneMessages
 {
@@ -15,8 +16,7 @@ final class PruneMessages
      */
     public function execute(PruneMessagesData $data): int
     {
-        /** @var class-string<Message> $model */
-        $model = config('messages.models.message', Message::class);
+        $model = MessageModel::class();
 
         $cutoff = now()->subDays($data->days);
 

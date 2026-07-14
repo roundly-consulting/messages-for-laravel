@@ -18,6 +18,7 @@ use RoundlyConsulting\Messages\Database\Factories\ParticipantFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
  * @property string $id
@@ -32,8 +33,10 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
  * @property CarbonInterface|null $deleted_at
  * @property-read Model|null $participant
  * @property-read Thread $thread
+ *
+ * Not final: `messages.models.participant` documents swapping in a host subclass.
  */
-final class Participant extends Model
+class Participant extends Model
 {
     use BroadcastsEvents;
 
@@ -72,7 +75,7 @@ final class Participant extends Model
         return $query->whereNull('read_at');
     }
 
-    public function markAsRead(): self
+    public function markAsRead(): static
     {
         $latest = $this->thread->latestMessage()->first();
 
@@ -95,13 +98,10 @@ final class Participant extends Model
         return $this->thread->unreadCountFor($participant) > 0;
     }
 
-    /** @return BelongsTo<Model, $this> */
+    /** @return BelongsTo<Thread, $this> */
     public function thread(): BelongsTo
     {
-        /** @var class-string<Model> $thread */
-        $thread = config('messages.models.thread', Thread::class);
-
-        return $this->belongsTo($thread);
+        return $this->belongsTo(ThreadModel::class(), 'thread_id');
     }
 
     /** @return MorphTo<Model, $this> */

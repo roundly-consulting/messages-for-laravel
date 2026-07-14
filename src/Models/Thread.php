@@ -23,7 +23,9 @@ use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
 use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ParticipantTyping;
+use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
+use RoundlyConsulting\Messages\Support\ParticipantModel;
 
 /**
  * @property string $id
@@ -40,8 +42,10 @@ use RoundlyConsulting\Messages\Support\MessagingPermissions;
  * @property-read Collection<int, Participant> $participants
  * @property-read Collection<int, Message> $messages
  * @property-read Message|null $latestMessage
+ *
+ * Not final: `messages.models.thread` documents swapping in a host subclass.
  */
-final class Thread extends Model
+class Thread extends Model
 {
     use BroadcastsEvents;
 
@@ -150,28 +154,19 @@ final class Thread extends Model
     /** @return HasMany<Participant, $this> */
     public function participants(): HasMany
     {
-        /** @var class-string<Participant> $participant */
-        $participant = config('messages.models.participant', Participant::class);
-
-        return $this->hasMany($participant);
+        return $this->hasMany(ParticipantModel::class());
     }
 
     /** @return HasMany<Message, $this> */
     public function messages(): HasMany
     {
-        /** @var class-string<Message> $message */
-        $message = config('messages.models.message', Message::class);
-
-        return $this->hasMany($message);
+        return $this->hasMany(MessageModel::class());
     }
 
     /** @return HasOne<Message, $this> */
     public function latestMessage(): HasOne
     {
-        /** @var class-string<Message> $message */
-        $message = config('messages.models.message', Message::class);
-
-        return $this->hasOne($message)->latestOfMany();
+        return $this->hasOne(MessageModel::class())->latestOfMany();
     }
 
     /**
@@ -189,8 +184,7 @@ final class Thread extends Model
 
     public function unreadCountFor(Model $participant): int
     {
-        /** @var class-string<Message> $message */
-        $message = config('messages.models.message', Message::class);
+        $message = MessageModel::class();
 
         return $message::query()
             ->where('thread_id', $this->getKey())

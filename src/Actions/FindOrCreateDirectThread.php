@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Actions;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 final class FindOrCreateDirectThread
 {
@@ -16,8 +17,7 @@ final class FindOrCreateDirectThread
 
     public function execute(Model $first, Model $second): Thread
     {
-        /** @var class-string<Thread> $model */
-        $model = config('messages.models.thread', Thread::class);
+        $model = ThreadModel::class();
 
         $existing = $model::query()->between($first, $second)->first();
 

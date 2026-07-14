@@ -10,6 +10,7 @@ use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadCreated;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 final class StartThread
 {
@@ -27,8 +28,7 @@ final class StartThread
             ? false
             : ($data->everyoneCanJoin ?? (bool) config('messages.publicity.everyone-can-join', false));
 
-        /** @var class-string<Thread> $model */
-        $model = config('messages.models.thread', Thread::class);
+        $model = ThreadModel::class();
 
         $thread = new $model([
             'name' => $data->name,

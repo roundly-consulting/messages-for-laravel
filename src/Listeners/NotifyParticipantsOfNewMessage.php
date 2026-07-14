@@ -25,6 +25,7 @@ final class NotifyParticipantsOfNewMessage
 
         $thread = $event->message->thread;
 
+        // An unsaved / orphaned message has no thread to notify.
         if (! $thread instanceof Thread) {
             return;
         }

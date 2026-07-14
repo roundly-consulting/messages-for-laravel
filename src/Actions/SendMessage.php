@@ -11,6 +11,7 @@ use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
 use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Support\MessageModel;
 
 final class SendMessage
 {
@@ -78,8 +79,7 @@ final class SendMessage
      */
     private function withQuoteSnapshot(SendMessageData $data, array $meta): array
     {
-        /** @var class-string<Message> $model */
-        $model = config('messages.models.message', Message::class);
+        $model = MessageModel::class();
 
         $parent = $model::query()->find($data->parentMessageId);
 

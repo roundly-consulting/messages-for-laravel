@@ -20,6 +20,9 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\ParticipantModel;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
  * Ergonomic messaging helpers for a participant model.
@@ -34,10 +37,7 @@ trait HasMessaging
     /** @return MorphMany<Participant, $this> */
     public function participations(): MorphMany
     {
-        /** @var class-string<Participant> $participant */
-        $participant = config('messages.models.participant', Participant::class);
-
-        return $this->morphMany($participant, 'participant');
+        return $this->morphMany(ParticipantModel::class(), 'participant');
     }
 
     /**
@@ -47,8 +47,7 @@ trait HasMessaging
      */
     public function threads(): Collection
     {
-        /** @var class-string<Thread> $model */
-        $model = config('messages.models.thread', Thread::class);
+        $model = ThreadModel::class();
 
         return $model::query()->forParticipant($this)->get();
     }
@@ -127,8 +126,7 @@ trait HasMessaging
             return $thread->unreadCountFor($this);
         }
 
-        /** @var class-string<Message> $model */
-        $model = config('messages.models.message', Message::class);
+        $model = MessageModel::class();
 
         return $model::query()->unreadFor($this)->count();
     }

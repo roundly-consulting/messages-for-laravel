@@ -17,6 +17,8 @@ use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 class MessagesManager
 {
@@ -60,8 +62,7 @@ class MessagesManager
         int $page = 1,
         string $pageName = 'page',
     ): LengthAwarePaginator {
-        /** @var class-string<Thread> $model */
-        $model = config('messages.models.thread', Thread::class);
+        $model = ThreadModel::class();
 
         return $model::query()
             ->inboxFor($participant)
@@ -88,8 +89,7 @@ class MessagesManager
             return $thread->unreadCountFor($participant);
         }
 
-        /** @var class-string<Message> $model */
-        $model = config('messages.models.message', Message::class);
+        $model = MessageModel::class();
 
         return $model::query()->unreadFor($participant)->count();
     }
