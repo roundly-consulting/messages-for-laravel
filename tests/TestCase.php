@@ -22,6 +22,24 @@ abstract class TestCase extends Orchestra
         ];
     }
 
+    /**
+     * Migrations are publish-only — the provider auto-loads nothing — so the suite
+     * runs them explicitly, in the same order a host gets them from the publish.
+     */
+    protected function defineDatabaseMigrations(): void
+    {
+        // Media-library ships the `media` table the attachments bucket persists into.
+        $mediaPackage = dirname((string) (new ReflectionClass(MediaLibraryServiceProvider::class))->getFileName(), 2);
+
+        $this->loadMigrationsFrom($mediaPackage.'/database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        Schema::create('users', fn (Blueprint $table) => $table->id());
+        Schema::create('restaurants', fn (Blueprint $table) => $table->id());
+        Schema::create('companies', fn (Blueprint $table) => $table->id());
+        Schema::create('notifiable_users', fn (Blueprint $table) => $table->id());
+    }
+
     protected function getEnvironmentSetUp($app): void
     {
         $app['config']->set('database.default', 'testing');
@@ -45,33 +63,5 @@ abstract class TestCase extends Orchestra
             'driver' => 'local',
             'root' => storage_path('framework/testing/disks/secure'),
         ]);
-
-        $this->setupDatabase();
-    }
-
-    protected function setupDatabase(): void
-    {
-        Schema::dropAllTables();
-
-        foreach ($this->migrationFiles() as $file) {
-            (include $file)->up();
-        }
-
-        Schema::create('users', fn (Blueprint $table) => $table->id());
-        Schema::create('restaurants', fn (Blueprint $table) => $table->id());
-        Schema::create('companies', fn (Blueprint $table) => $table->id());
-        Schema::create('notifiable_users', fn (Blueprint $table) => $table->id());
-    }
-
-    /** @return list<string> */
-    private function migrationFiles(): array
-    {
-        $files = glob(__DIR__.'/../database/migrations/*.php') ?: [];
-
-        // Media-library ships the `media` table the attachments bucket persists into.
-        $mediaPackage = dirname((string) (new ReflectionClass(MediaLibraryServiceProvider::class))->getFileName(), 2);
-        $files = [...$files, ...(glob($mediaPackage.'/database/migrations/*.php') ?: [])];
-
-        return array_values($files);
     }
 }

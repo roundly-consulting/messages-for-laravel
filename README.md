@@ -24,12 +24,15 @@ no third-party runtime dependencies.
 composer require roundly-consulting/messages-for-laravel
 ```
 
-Publish and run the migrations:
+Migrations are **not loaded automatically** — publish them first, then migrate:
 
 ```bash
 php artisan vendor:publish --tag="messages-migrations"
 php artisan migrate
 ```
+
+They land in your `database/migrations` under timestamped filenames that preserve the order
+the tables depend on each other in, so they interleave correctly with your own migrations.
 
 Optionally publish the config or translations:
 
@@ -192,7 +195,7 @@ and configure a disk:
 ```bash
 composer require roundly-consulting/messages-for-laravel
 php artisan vendor:publish --tag="media-config"   # set the attachments disk + streaming route
-php artisan migrate                                # creates the `media` table
+php artisan migrate                               # creates the `media` table
 ```
 
 ### Sending with attachments
