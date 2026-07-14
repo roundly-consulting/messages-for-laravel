@@ -151,22 +151,28 @@ class Thread extends Model
         return ThreadFactory::new();
     }
 
-    /** @return HasMany<Participant, $this> */
+    /**
+     * The foreign key is named explicitly: Eloquent would otherwise derive it
+     * from *this* class, so a host subclass configured in `messages.models.thread`
+     * would look for `custom_thread_id`.
+     *
+     * @return HasMany<Participant, $this>
+     */
     public function participants(): HasMany
     {
-        return $this->hasMany(ParticipantModel::class());
+        return $this->hasMany(ParticipantModel::class(), 'thread_id');
     }
 
     /** @return HasMany<Message, $this> */
     public function messages(): HasMany
     {
-        return $this->hasMany(MessageModel::class());
+        return $this->hasMany(MessageModel::class(), 'thread_id');
     }
 
     /** @return HasOne<Message, $this> */
     public function latestMessage(): HasOne
     {
-        return $this->hasOne(MessageModel::class())->latestOfMany();
+        return $this->hasOne(MessageModel::class(), 'thread_id')->latestOfMany();
     }
 
     /**
