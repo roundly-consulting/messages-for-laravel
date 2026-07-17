@@ -16,7 +16,7 @@ return new class extends Migration
             }
 
             if (! Schema::hasColumn('messaging_messages', 'meta')) {
-                $table->json('meta')->nullable()->after('type');
+                $table->jsonb('meta')->nullable()->after('type');
             }
         });
     }
