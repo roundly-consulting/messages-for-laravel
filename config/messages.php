@@ -16,7 +16,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Primary Key Type
+    | Key Type (outbound — the models a message/participant points at)
+    |--------------------------------------------------------------------------
+    |
+    | The primary-key strategy of the models this package points *at* polymorphically:
+    | the message sender and the thread participant. It sets the column type of the
+    | sender / participant morph keys and must match those models' primary key:
+    | "bigint" (the Laravel default), "uuid" or "ulid". Anything unrecognized falls
+    | back to "bigint".
+    |
+    | This is a DIFFERENT axis from "primary_key_type" below: this is your senders'
+    | and participants' key type (the models you point at), that is the package's own
+    | tables' key type (what other packages point at). A host with bigint users and a
+    | uuid-keyed messages install is a perfectly ordinary application. Your morph
+    | targets must share one key type — set this to match.
+    |
+    */
+
+    'key_type' => env('MESSAGES_KEY_TYPE', 'bigint'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Primary Key Type (inbound — the messaging tables' own ids)
     |--------------------------------------------------------------------------
     |
     | The primary-key strategy of the package's own tables — threads, messages and

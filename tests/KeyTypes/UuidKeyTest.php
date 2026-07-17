@@ -38,6 +38,19 @@ it('emits string id columns across every messaging table', function (): void {
 });
 
 /**
+ * The two-axes independence proof, inbound half. This leg sets ONLY the inbound
+ * `primary_key_type` to uuid; the outbound `key_type` is left at its bigint default, so the
+ * sender / participant morph ids must stay bigint even though the pk is now a uuid. Flipping
+ * one axis must not drag the other.
+ */
+it('keeps the outbound morph ids bigint while the pk is uuid', function (): void {
+    $integerish = ['integer', 'bigint', 'int8'];
+
+    expect(Schema::getColumnType('messaging_messages', 'sender_id'))->toBeIn($integerish)
+        ->and(Schema::getColumnType('messaging_participants', 'participant_id'))->toBeIn($integerish);
+});
+
+/**
  * The `id desc` tiebreak must stay monotonic on this leg too — here it rests on uuid7 being
  * time-ordered, which is the justification the bigint default replaces with a sequence.
  */

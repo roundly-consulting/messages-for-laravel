@@ -38,6 +38,19 @@ it('emits integer id columns across every messaging table', function (): void {
  * against *itself* — a FK constraint between mismatched column types is uncreatable, so the
  * migration does not even run.
  */
+/**
+ * The outbound morph axis default. `messages.key_type` governs the sender and participant
+ * morph ids; unset, it defaults to bigint exactly like the raw `morphs()`/`nullableMorphs()`
+ * it replaced — so a default install's morph columns are byte-identical integers. This is
+ * the *other* axis from the pk above, and on the default both land on bigint.
+ */
+it('defaults the outbound sender and participant morph ids to bigint', function (): void {
+    $integerish = ['integer', 'bigint', 'int8'];
+
+    expect(Schema::getColumnType('messaging_messages', 'sender_id'))->toBeIn($integerish)
+        ->and(Schema::getColumnType('messaging_participants', 'participant_id'))->toBeIn($integerish);
+});
+
 it('tracks the primary key across all four internal foreign keys', function (): void {
     $integerish = ['integer', 'bigint', 'int8'];
 

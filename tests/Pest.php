@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Testing\MessageExpectations;
+use RoundlyConsulting\Messages\Tests\Fixtures\MorphUuidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\SwappedModelsTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\UlidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\UuidKeyTestCase;
@@ -62,5 +63,11 @@ uses(SwappedModelsTestCase::class)->in(__DIR__.'/ModelSwap');
  */
 uses(UuidKeyTestCase::class)->in(__DIR__.'/KeyTypes/UuidKeyTest.php');
 uses(UlidKeyTestCase::class)->in(__DIR__.'/KeyTypes/UlidKeyTest.php');
+
+/**
+ * The outbound morph axis. This leg sets ONLY `messages.key_type` (leaving the inbound
+ * `primary_key_type` at its bigint default) to prove the two key types are independent.
+ */
+uses(MorphUuidKeyTestCase::class)->in(__DIR__.'/KeyTypes/MorphKeyTypeTest.php');
 
 MessageExpectations::register();
