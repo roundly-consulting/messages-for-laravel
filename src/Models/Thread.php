@@ -48,11 +48,11 @@ use RoundlyConsulting\Messages\Support\ParticipantModel;
 class Thread extends Model
 {
     use BroadcastsEvents;
-
     use HasConfigurableKey;
 
     /** @use HasFactory<ThreadFactory> */
     use HasFactory;
+
     use SoftDeletes;
 
     protected $table = 'messaging_threads';
