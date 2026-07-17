@@ -8,6 +8,6 @@ final readonly class PruneMessagesData
 {
     public function __construct(
         public int $days,
-        public ?string $threadId = null,
+        public int|string|null $threadId = null,
     ) {}
 }

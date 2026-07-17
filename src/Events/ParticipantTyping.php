@@ -37,7 +37,7 @@ final class ParticipantTyping implements ShouldBroadcast
 
         $channel = (string) config('messages.broadcasting.messages.channel');
 
-        return [new PrivateChannel(str_replace('{id}', $this->thread->getKey(), $channel))];
+        return [new PrivateChannel(str_replace('{id}', (string) $this->thread->getKey(), $channel))];
     }
 
     public function broadcastAs(): string

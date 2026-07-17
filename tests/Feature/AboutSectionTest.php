@@ -46,14 +46,22 @@ it('renders the messages section without leaking a private conversation', functi
             // way it is. None of it may ever reach a console.
             'the wire clears on Thursday',
             'Series B term sheet',
-            (string) $message->getKey(),
-            (string) $thread->getKey(),
+
+            // NOTE: the message and thread ids used to be pinned here. They cannot be, now
+            // that `messages.primary_key_type` defaults to bigint: the ids are the integers
+            // `1`, and a one-character substring canary matches unrelated output ("120 chars",
+            // "90 days") and fails for a reason that has nothing to do with a leak. The user
+            // content above is what this check is really for, and it still bites.
         ],
         mustRender: [
             // The positive proof the section reports rather than sitting empty.
             'Thread model',
             'Message model',
             'Participant model',
+            // The key type is surfaced so a host that has flipped it away from bigint — and
+            // thereby out of reach of every bigint morph column in the fleet — can see it.
+            'Key type',
+            'bigint',
             'New threads',
             'Roles',
             'Broadcasting',

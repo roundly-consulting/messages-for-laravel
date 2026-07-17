@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Testing\MessageExpectations;
 use RoundlyConsulting\Messages\Tests\Fixtures\SwappedModelsTestCase;
+use RoundlyConsulting\Messages\Tests\Fixtures\UlidKeyTestCase;
+use RoundlyConsulting\Messages\Tests\Fixtures\UuidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\TestCase;
 
 /**
@@ -30,6 +32,9 @@ uses(TestCase::class)->in(
     __DIR__.'/Feature',
     __DIR__.'/HelpersTest.php',
     __DIR__.'/Http',
+    // The bigint leg rides the default base case precisely because it must prove the
+    // *unconfigured* install is correct.
+    __DIR__.'/KeyTypes/BigIntKeyTest.php',
     __DIR__.'/MessagesRepositoryTest.php',
     __DIR__.'/MessageTest.php',
     __DIR__.'/MessagingServiceTest.php',
@@ -48,5 +53,14 @@ uses(TestCase::class)->in(
  * the providers boot, so they run on their own base case in their own directory.
  */
 uses(SwappedModelsTestCase::class)->in(__DIR__.'/ModelSwap');
+
+/**
+ * The key-type seam is fixed at migrate time — the migrations read it to pick the `id` column
+ * AND the four internal foreign keys — so each non-default leg needs
+ * `messages.primary_key_type` set before the providers boot. A base case per key type is the
+ * only way to reach that window.
+ */
+uses(UuidKeyTestCase::class)->in(__DIR__.'/KeyTypes/UuidKeyTest.php');
+uses(UlidKeyTestCase::class)->in(__DIR__.'/KeyTypes/UlidKeyTest.php');
 
 MessageExpectations::register();

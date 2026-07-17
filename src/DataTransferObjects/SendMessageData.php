@@ -22,7 +22,7 @@ final readonly class SendMessageData
         public string $body,
         public MessageType $type = MessageType::Text,
         public array $meta = [],
-        public ?string $parentMessageId = null,
+        public int|string|null $parentMessageId = null,
         public array $attachments = [],
         public array $uploads = [],
     ) {}

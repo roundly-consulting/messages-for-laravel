@@ -14,6 +14,28 @@ return [
         'participant' => Participant::class,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Primary Key Type
+    |--------------------------------------------------------------------------
+    |
+    | The primary-key strategy of the package's own tables — threads, messages and
+    | participants, plus every internal foreign key between them (thread_id,
+    | parent_message_id, last_read_message_id): "bigint" (the Laravel default),
+    | "uuid" or "ulid". Anything unrecognized falls back to "bigint".
+    |
+    | This is the key OTHER packages' polymorphic columns point at. A morph column
+    | (`likeable_id`, `reportable_id`, ...) defaults to an unsigned bigint, so on a
+    | strict engine such as PostgreSQL a non-bigint thread or message id cannot be
+    | related to polymorphically. Change this only if every morph target in your
+    | application shares the same key type — see "Key types" in the README.
+    |
+    | It is fixed when the migrations first run, so choose it before publishing them.
+    |
+    */
+
+    'primary_key_type' => env('MESSAGES_PRIMARY_KEY_TYPE', 'bigint'),
+
     'publicity' => [
         'public-by-default' => env('THREADS_PUBLIC', false),
         'everyone-can-join' => env('THREADS_EVERYONE_CAN_JOIN', false),

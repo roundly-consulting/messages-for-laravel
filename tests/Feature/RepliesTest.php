@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
@@ -93,6 +92,13 @@ it('rejects a reply to a message in another thread', function () {
     ));
 })->throws(MessageException::class);
 
+/**
+ * The absent id must be well-typed for the configured key type (bigint by default). A random
+ * uuid here is not "a missing message" but a type error: SQLite swallowed it by affinity and
+ * returned no row, while Postgres rejects the lookup outright with a QueryException — which
+ * is a different failure than the one this test means to pin. What it proves is that a
+ * *valid but absent* parent is refused by the package, not by the driver.
+ */
 it('rejects a reply to a missing parent message', function () {
     $user = User::create();
     $thread = messaging()->threads()->create(name: 'Chat');
@@ -101,7 +107,7 @@ it('rejects a reply to a missing parent message', function () {
         thread: $thread,
         sender: $user,
         body: 'reply',
-        parentMessageId: (string) Str::uuid(),
+        parentMessageId: 999_999_999,
     ));
 })->throws(MessageException::class);
 

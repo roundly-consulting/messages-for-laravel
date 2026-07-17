@@ -457,6 +457,8 @@ return [
         'participant' => RoundlyConsulting\Messages\Models\Participant::class,
     ],
 
+    'primary_key_type' => env('MESSAGES_PRIMARY_KEY_TYPE', 'bigint'),
+
     'publicity' => [
         'public-by-default' => env('THREADS_PUBLIC', false),
         'everyone-can-join' => env('THREADS_EVERYONE_CAN_JOIN', false),
@@ -494,6 +496,7 @@ return [
 | Key | Type | Default | Backed by |
 |---|---|---|---|
 | `models.message` / `models.thread` / `models.participant` | class-string | the package models | — |
+| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `MESSAGES_PRIMARY_KEY_TYPE` | The key type of the package's own tables and every internal foreign key. Fixed at first migrate. See [Key types](#key-types). |
 | `publicity.public-by-default` | bool | `false` | `THREADS_PUBLIC` |
 | `publicity.everyone-can-join` | bool | `false` | `THREADS_EVERYONE_CAN_JOIN` |
 | `system-messages.enabled` | bool | `false` | `MESSAGES_SYSTEM_MESSAGES` |
@@ -507,6 +510,36 @@ return [
 | `broadcasting.*.channel` / `*.events.*` | string | see config | — |
 
 Swap any `models.*` entry for your own subclass to extend behaviour.
+
+### Key types
+
+`primary_key_type` sets the key type of the package's own tables — `messaging_threads`,
+`messaging_messages`, `messaging_participants` — **and every internal foreign key between
+them** (`thread_id`, `parent_message_id`, `last_read_message_id`). It is read when the
+migrations run, so choose it **before** you publish and migrate; changing it afterwards is a
+data migration, not a config change.
+
+```dotenv
+MESSAGES_PRIMARY_KEY_TYPE=uuid   # bigint (default) | uuid | ulid
+```
+
+**Why it defaults to `bigint`.** A thread or a message is a thing other packages point *at*
+polymorphically, and a Laravel morph column (`$table->morphs('subject')`) is an unsigned
+bigint. On a strict engine such as PostgreSQL, a `uuid` id will not go into one:
+
+```
+SQLSTATE[22P02]: invalid input syntax for type bigint: "019f6f33-22b8-737f-a581-849e7cdc517a"
+```
+
+SQLite will **not** warn you about this — its type affinity stores the string in an integer
+column silently, so a green SQLite suite proves nothing here.
+
+> **Constraint:** this assumes every morph target in your application shares one key type. If
+> you set `MESSAGES_PRIMARY_KEY_TYPE=uuid`, the models on the other end of your polymorphic
+> relations need to be uuid-keyed too, and the packages owning those columns need to agree. A
+> mixed application — a `uuid` `Thread` and a `bigint` `Post` pointed at by the same morph
+> column — is not supported by this package, by Laravel's own `morphs()`/`uuidMorphs()` split,
+> or by anything else. Pick one key type per application.
 
 ## Broadcasting
 

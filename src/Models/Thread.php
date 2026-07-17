@@ -10,7 +10,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection as SupportCollection;
 use RoundlyConsulting\Messages\Actions\MarkRead;
+use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
 use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
@@ -28,7 +28,7 @@ use RoundlyConsulting\Messages\Support\MessagingPermissions;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 
 /**
- * @property string $id
+ * @property int|string $id
  * @property string|null $name
  * @property bool $is_direct
  * @property bool $is_public
@@ -49,10 +49,10 @@ class Thread extends Model
 {
     use BroadcastsEvents;
 
+    use HasConfigurableKey;
+
     /** @use HasFactory<ThreadFactory> */
     use HasFactory;
-
-    use HasUuids;
     use SoftDeletes;
 
     protected $table = 'messaging_threads';
@@ -185,23 +185,35 @@ class Thread extends Model
      * if (! array_key_exists($keyName, $columns)) { $columns[$keyName] = 'MAX'; }
      * ```
      *
-     * This model's key is a uuid, and Postgres ships no `max(uuid)`/`min(uuid)` aggregate,
+     * When this model's key is a uuid, Postgres ships no `max(uuid)`/`min(uuid)` aggregate,
      * so every read of this relation raised `function max(uuid) does not exist` on a real
      * engine — `latestMessagePreview()`, the inbox eager-load, and `MarkRead` alike. SQLite
      * compares uuids as text and aggregates them happily, which is the only reason the suite
      * never saw it. `latestOfMany('created_at')` does **not** fix it: the key is still forced
      * in, so the subquery keeps `MAX("id")`.
      *
+     * The key type is now configurable and defaults to `bigint`, for which `max(bigint)` does
+     * exist — but `ofMany()` is still wrong here, because the relation must keep working on
+     * the `uuid` setting too. This ordering is key-type agnostic and stays.
+     *
      * Ordering needs no aggregate and is identical on every engine:
      *  - `created_at` desc is the real intent — the newest message by time. It is the primary
      *    sort so a backfilled/imported history sorts by when it was *sent*, not by when the
      *    row happened to be inserted.
-     *  - `id` desc breaks ties, and is not an arbitrary tiebreak: {@see HasUuids} mints
-     *    `Str::uuid7()`, which is time-ordered, so within one `created_at` the greater uuid is
-     *    genuinely the later message. Ties are the normal case, not the edge — Laravel stores
-     *    timestamps at second precision, and a suite with `Carbon::setTestNow()` frozen gives
-     *    every message the same instant. Without the tiebreak the winner would be whatever the
-     *    engine returned first.
+     *  - `id` desc breaks ties, and is not an arbitrary tiebreak: it is monotonic with
+     *    insertion for **every** supported key type, so within one `created_at` the greater id
+     *    is genuinely the later message.
+     *      - `bigint` (the default) — an auto-increment sequence is monotonic by construction.
+     *        This is the *strongest* of the three, not a weakening: it is a guarantee rather
+     *        than a property of a minting algorithm.
+     *      - `uuid` — {@see HasConfigurableKey::newUniqueId()} mints `Str::uuid7()`, which is
+     *        time-ordered.
+     *      - `ulid` — `Str::ulid()` is time-ordered with a monotonic counter within a
+     *        millisecond.
+     *    Ties are the normal case, not the edge — Laravel stores timestamps at second
+     *    precision, and a suite with `Carbon::setTestNow()` frozen gives every message the
+     *    same instant. Without the tiebreak the winner would be whatever the engine returned
+     *    first.
      *
      * @return HasOne<Message, $this>
      */

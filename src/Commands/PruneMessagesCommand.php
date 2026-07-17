@@ -19,8 +19,15 @@ final class PruneMessagesCommand extends Command
         $days = $this->option('days');
         $days = is_numeric($days) ? (int) $days : (int) config('messages.prune.days', 90);
 
+        // A thread id is a string off the CLI but an int when the key type is bigint and the
+        // command is called programmatically (`Artisan::call`, a test). `is_string()` alone
+        // silently dropped the filter and pruned EVERY thread.
         $thread = $this->option('thread');
-        $threadId = is_string($thread) && $thread !== '' ? $thread : null;
+        $threadId = match (true) {
+            is_string($thread) && $thread !== '' => $thread,
+            is_int($thread) => $thread,
+            default => null,
+        };
 
         $deleted = $pruneMessages->execute(new PruneMessagesData(
             days: $days,

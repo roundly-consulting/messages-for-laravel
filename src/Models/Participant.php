@@ -8,12 +8,12 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Database\Factories\ParticipantFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
@@ -21,13 +21,13 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
- * @property string $id
- * @property string $thread_id
+ * @property int|string $id
+ * @property int|string $thread_id
  * @property string $participant_type
  * @property int|string $participant_id
  * @property ParticipantRole|null $role
  * @property CarbonInterface|null $read_at
- * @property string|null $last_read_message_id
+ * @property int|string|null $last_read_message_id
  * @property CarbonInterface $created_at
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
@@ -39,11 +39,11 @@ use RoundlyConsulting\Messages\Support\ThreadModel;
 class Participant extends Model
 {
     use BroadcastsEvents;
+    use HasConfigurableKey;
 
     /** @use HasFactory<ParticipantFactory> */
     use HasFactory;
 
-    use HasUuids;
     use SoftDeletes;
 
     protected $table = 'messaging_participants';
@@ -144,7 +144,7 @@ class Participant extends Model
         $channel = (string) config('messages.broadcasting.participants.channel');
 
         return new PrivateChannel(
-            str_replace('{id}', $this->thread_id, $channel),
+            str_replace('{id}', (string) $this->thread_id, $channel),
         );
     }
 

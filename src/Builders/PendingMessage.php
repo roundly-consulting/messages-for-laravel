@@ -18,7 +18,7 @@ final class PendingMessage
 
     private MessageType $type = MessageType::Text;
 
-    private ?string $parentMessageId = null;
+    private int|string|null $parentMessageId = null;
 
     private ?string $systemKey = null;
 
@@ -52,7 +52,7 @@ final class PendingMessage
 
     public function replyingTo(Message $message): self
     {
-        $this->parentMessageId = (string) $message->getKey();
+        $this->parentMessageId = $message->getKey();
 
         return $this;
     }

@@ -12,11 +12,15 @@ use RoundlyConsulting\Messages\Listeners\WarmMessageMediaVariants;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
+use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
+use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 
 final class MessagesServiceProvider extends PackageServiceProvider
 {
+    use RegistersBlueprintMacros;
+
     public function configurePackage(Package $package): void
     {
         $package
@@ -46,6 +50,10 @@ final class MessagesServiceProvider extends PackageServiceProvider
                 'Thread model' => class_basename(ThreadModel::class()),
                 'Message model' => class_basename(MessageModel::class()),
                 'Participant model' => class_basename(ParticipantModel::class()),
+                // Surfaced deliberately: a non-bigint id cannot be held by another package's
+                // `morphs()` column on a strict engine, so a host that has flipped this needs
+                // to see it without reading a migration.
+                'Key type' => KeyType::fromConfig('messages.primary_key_type')->value,
                 'New threads' => self::publicity(),
                 'Roles' => config('messages.permissions.enabled') === true ? 'ENFORCED' : 'OFF',
                 'System messages' => config('messages.system-messages.enabled') === true ? 'ON' : 'OFF',
@@ -76,6 +84,11 @@ final class MessagesServiceProvider extends PackageServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // The migrations key `last_read_message_id` off the toolkit's `ownerKey` macro, so it
+        // must exist before they run. Registration is idempotent — the toolkit guards it with
+        // `hasMacro()`.
+        $this->registerBlueprintMacros();
 
         Event::listen(MessageSent::class, NotifyParticipantsOfNewMessage::class);
         Event::listen(MessageSent::class, WarmMessageMediaVariants::class);

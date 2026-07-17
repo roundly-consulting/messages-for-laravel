@@ -9,7 +9,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Database\Eloquent\BroadcastsEvents;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Concerns\HasMessageMedia;
 use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
 use RoundlyConsulting\Messages\Enums\MessageType;
@@ -29,9 +29,9 @@ use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
- * @property string $id
- * @property string $thread_id
- * @property string|null $parent_message_id
+ * @property int|string $id
+ * @property int|string $thread_id
+ * @property int|string|null $parent_message_id
  * @property string|null $sender_type
  * @property int|string|null $sender_id
  * @property string $message
@@ -50,12 +50,12 @@ use RoundlyConsulting\Messages\Support\ThreadModel;
 class Message extends Model implements HasMedia
 {
     use BroadcastsEvents;
+    use HasConfigurableKey;
 
     /** @use HasFactory<MessageFactory> */
     use HasFactory;
 
     use HasMessageMedia;
-    use HasUuids;
     use SoftDeletes;
 
     protected $table = 'messaging_messages';
@@ -227,7 +227,7 @@ class Message extends Model implements HasMedia
         $channel = (string) config('messages.broadcasting.messages.channel');
 
         return new PrivateChannel(
-            str_replace('{id}', $this->thread_id, $channel),
+            str_replace('{id}', (string) $this->thread_id, $channel),
         );
     }
 
