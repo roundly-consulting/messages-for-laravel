@@ -148,8 +148,22 @@ class Participant extends Model
         );
     }
 
+    /**
+     * Literal keys rather than `config('messages.broadcasting.participants.events.'.$event)`.
+     * See {@see Message::broadcastAs()} — a concatenated key cannot be checked against the
+     * shipped file, and the event set is closed.
+     */
     public function broadcastAs(string $event): string
     {
-        return (string) config('messages.broadcasting.participants.events.'.$event);
+        $key = match ($event) {
+            'created' => 'messages.broadcasting.participants.events.created',
+            'updated' => 'messages.broadcasting.participants.events.updated',
+            'trashed' => 'messages.broadcasting.participants.events.trashed',
+            'restored' => 'messages.broadcasting.participants.events.restored',
+            'deleted' => 'messages.broadcasting.participants.events.deleted',
+            default => null,
+        };
+
+        return $key === null ? '' : (string) config($key);
     }
 }

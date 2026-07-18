@@ -231,8 +231,27 @@ class Message extends Model implements HasMedia
         );
     }
 
+    /**
+     * Literal keys rather than `config('messages.broadcasting.messages.events.'.$event)`: a
+     * concatenated key cannot be verified against the shipped config file, which is the exact
+     * shape that let shops #18 read a key the package never shipped while its suite stayed
+     * green. The set is closed — {@see BroadcastsEvents} broadcasts precisely these five —
+     * so enumerating them costs nothing and makes every leaf checkable.
+     *
+     * An unknown event returns '' exactly as the concatenated read did (a missing key gave
+     * null, cast to '').
+     */
     public function broadcastAs(string $event): string
     {
-        return (string) config('messages.broadcasting.messages.events.'.$event);
+        $key = match ($event) {
+            'created' => 'messages.broadcasting.messages.events.created',
+            'updated' => 'messages.broadcasting.messages.events.updated',
+            'trashed' => 'messages.broadcasting.messages.events.trashed',
+            'restored' => 'messages.broadcasting.messages.events.restored',
+            'deleted' => 'messages.broadcasting.messages.events.deleted',
+            default => null,
+        };
+
+        return $key === null ? '' : (string) config($key);
     }
 }

@@ -3,8 +3,50 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Testing\MessageExpectations;
+use RoundlyConsulting\Messages\Tests\Fixtures\SwappedModelsTestCase;
 use RoundlyConsulting\Messages\Tests\TestCase;
 
-uses(TestCase::class)->in(__DIR__);
+/**
+ * Explicit paths, not `->in(__DIR__)`: the ModelSwap directory below needs a different base
+ * case, and a blanket bind claims it first — Pest binds a test case per directory, not per
+ * file, and errors out ("the folder already uses the test case") rather than picking the
+ * more specific one.
+ *
+ * The root-level test files are named individually because `->in()` accepts a file path as
+ * well as a directory. ArchTest.php is listed for a second reason: it needs the app booted
+ * (`swappableModelsAreNotFinal` reads the `messages.models.*` config defaults), and an arch
+ * file is not automatically test-cased.
+ */
+uses(TestCase::class)->in(
+    __DIR__.'/Actions',
+    __DIR__.'/ArchTest.php',
+    __DIR__.'/Builders',
+    __DIR__.'/Commands',
+    __DIR__.'/Concerns',
+    __DIR__.'/DataTransferObjects',
+    __DIR__.'/Enums',
+    __DIR__.'/Events',
+    __DIR__.'/Facades',
+    __DIR__.'/Feature',
+    __DIR__.'/HelpersTest.php',
+    __DIR__.'/Http',
+    __DIR__.'/MessagesRepositoryTest.php',
+    __DIR__.'/MessageTest.php',
+    __DIR__.'/MessagingServiceTest.php',
+    __DIR__.'/Models',
+    __DIR__.'/Notifications',
+    __DIR__.'/ParticipantsRepositoryTest.php',
+    __DIR__.'/ParticipantTest.php',
+    __DIR__.'/Support',
+    __DIR__.'/Testing',
+    __DIR__.'/ThreadsRepositoryTest.php',
+    __DIR__.'/ThreadTest.php',
+);
+
+/**
+ * The model-swap proofs need every `messages.models.*` key pointed at a host subclass BEFORE
+ * the providers boot, so they run on their own base case in their own directory.
+ */
+uses(SwappedModelsTestCase::class)->in(__DIR__.'/ModelSwap');
 
 MessageExpectations::register();

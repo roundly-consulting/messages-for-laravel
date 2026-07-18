@@ -2,142 +2,86 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Messages\MessagesServiceProvider;
+use RoundlyConsulting\PackageToolkit\Enums\DatabaseDriver;
+use RoundlyConsulting\Testing\Database\DriverMatrix;
 
 /**
- * The package ships three CREATEs and six ALTERs, and two of the CREATEs carry a
- * real foreign key onto `messaging_threads`. Publishing preserves the source
- * directory's order, so that order has to be runnable end to end: every table
- * must exist before anything references or alters it.
+ * Messages ships three CREATEs and six ALTERs, with three real foreign keys:
+ * `messaging_messages.thread_id` and `messaging_participants.thread_id` onto
+ * `messaging_threads`, plus the self-referencing `messaging_messages.parent_message_id`
+ * added by an ALTER. Publishing preserves the source order, so that order has to be
+ * runnable end to end.
  *
- * Before the sources were renamed, the directory sorted
- * `create_messaging_messages_table` (FK → messaging_threads) FIRST and
- * `create_messaging_threads_table` third — unrunnable on any engine that enforces
- * foreign keys at DDL time. SQLite happily creates a table referencing a missing
- * parent, which is exactly why the suite never caught it; PostgreSQL and MySQL do
- * not.
- *
- * These tests run the *published* files — under their published names, into a
- * database that starts empty — which is what a host actually does.
+ * This file replaces ~130 lines of hand-rolled migration machinery (a bespoke published-copy
+ * harness, a hand-built sqlite connection, and string-position assertions). The presets
+ * cover the same ground, pinned so they cannot pass over an empty parse — and the `R` half
+ * runs it against an engine that actually enforces the constraints, which the hand-rolled
+ * version could never do: it built its own SQLite connection.
  */
-beforeEach(function (): void {
-    $this->publishedPath = sys_get_temp_dir().'/messages-migration-order-'.bin2hex(random_bytes(6));
-    $this->publishedDatabase = $this->publishedPath.'/database.sqlite';
+$migrations = __DIR__.'/../../database/migrations';
 
-    File::makeDirectory($this->publishedPath, recursive: true);
-    File::put($this->publishedDatabase, '');
-
-    // Copy every source to the filename it publishes under, so the migrator sees
-    // precisely what lands in a host's database/migrations directory.
-    foreach (ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-migrations') as $source => $target) {
-        File::copy($source, $this->publishedPath.'/'.basename((string) $target));
-    }
-
-    config()->set('database.connections.published', [
-        'driver' => 'sqlite',
-        'database' => $this->publishedDatabase,
-        'prefix' => '',
-        'foreign_key_constraints' => true,
-    ]);
+/**
+ * M — the structural pin. Five packages shipped uninstallable migration orders under green
+ * SQLite suites. `foreignKeys: 3` pins the edge count so the check can never pass over an
+ * empty parse.
+ *
+ * M also pins the other, non-FK half `MigrationGraph` checks: that every `Schema::table()`
+ * ALTER sorts at or after the CREATE of the table it alters. Messages ships six ALTERs —
+ * the most in the fleet outside shops — so that half is doing real work here. Before these
+ * files were renamed, `create_messaging_messages_table` sorted FIRST and
+ * `create_messaging_threads_table` third: unrunnable on any engine that enforces foreign
+ * keys at DDL time.
+ */
+it('creates every table before the migrations that reference or alter it', function () use ($migrations): void {
+    expect($migrations)->toHaveRunnableMigrationOrder(foreignKeys: 3);
 });
 
-afterEach(function (): void {
-    File::deleteDirectory($this->publishedPath);
+/**
+ * P — the publish-only guards. The fleet publishes migrations timestamped rather than
+ * auto-loading them; doing both runs both copies and dies on a duplicate table (bug #5, on
+ * three packages). `9` pins the file count so neither check can pass over an empty or
+ * relocated directory.
+ */
+it('never auto-loads its migrations — the host publishes them', function (): void {
+    expect(MessagesServiceProvider::class)->toNotAutoLoadMigrations();
 });
 
-it('migrates the published files clean from an empty database', function (): void {
-    $schema = Schema::connection('published');
-
-    expect($schema->hasTable('messaging_threads'))->toBeFalse();
-
-    $this->artisan('migrate', [
-        '--database' => 'published',
-        '--path' => $this->publishedPath,
-        '--realpath' => true,
-    ])->assertExitCode(0);
-
-    expect($schema->hasTable('messaging_threads'))->toBeTrue()
-        ->and($schema->hasTable('messaging_messages'))->toBeTrue()
-        ->and($schema->hasTable('messaging_participants'))->toBeTrue();
-
-    // Every ALTER ran against a table that already existed.
-    expect($schema->hasColumns('messaging_messages', ['parent_message_id', 'type', 'meta']))->toBeTrue()
-        ->and($schema->hasColumns('messaging_participants', ['last_read_message_id', 'role']))->toBeTrue()
-        ->and($schema->hasColumns('messaging_threads', ['archived_at', 'is_direct']))->toBeTrue();
+it('publishes its migrations timestamp-injected into the host', function (): void {
+    expect(MessagesServiceProvider::class)->toPublishMigrationsTimestamped('messages-migrations', 9);
 });
 
-it('keeps every foreign key intact in the published schema', function (): void {
-    $this->artisan('migrate', [
-        '--database' => 'published',
-        '--path' => $this->publishedPath,
-        '--realpath' => true,
-    ])->assertExitCode(0);
+/**
+ * R — the behavioural half, on an engine that can actually refuse. Gated on reachability so
+ * it skips *visibly* off the pgsql leg rather than passing vacuously.
+ *
+ * `migrations: 9` pins the count, and the assertion fails hard if a set "applies cleanly"
+ * while creating no tables — an empty `up()` would otherwise pass and prove nothing.
+ */
+it('applies the published order cleanly on postgres', function () use ($migrations): void {
+    expect($migrations)->toApplyOnConnection('pgsql', migrations: 9);
+})->skip(fn (): bool => ! test()->connectionAvailable('pgsql'), 'pgsql connection not available');
 
-    $schema = Schema::connection('published');
-
-    $references = static fn (string $table): array => array_map(
-        static fn (array $key): string => (string) $key['foreign_table'],
-        $schema->getForeignKeys($table),
+/**
+ * The negative control. It fits here — unlike a 0-FK row, where reversing the file list
+ * leaves Postgres nothing to refuse and the control fails by design. Messages has three real
+ * FK edges, so a reversed order puts children before parents and Postgres genuinely rejects
+ * it. If this ever goes green-by-acceptance the assertion says so loudly.
+ */
+it('is refused by postgres when the order is broken', function () use ($migrations): void {
+    expect($migrations)->toRejectBrokenOrderOnConnection(
+        fn (array $files): array => array_reverse($files),
+        'pgsql',
     );
+})->skip(fn (): bool => ! test()->connectionAvailable('pgsql'), 'pgsql connection not available');
 
-    // Both child tables really do constrain onto the threads table — so the CREATE
-    // order is load-bearing, not incidental.
-    expect($references('messaging_messages'))->toContain('messaging_threads')
-        ->and($references('messaging_participants'))->toContain('messaging_threads');
-});
-
-it('publishes every migration under a name that sorts after the table it depends on', function (): void {
-    $published = array_map(
-        static fn (string $target): string => basename($target),
-        array_values(ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-migrations')),
-    );
-
-    $position = static function (string $needle) use ($published): int {
-        foreach ($published as $index => $name) {
-            if (str_contains($name, $needle)) {
-                return $index;
-            }
-        }
-
-        return -1;
-    };
-
-    $threads = $position('create_messaging_threads_table');
-    $messages = $position('create_messaging_messages_table');
-    $participants = $position('create_messaging_participants_table');
-
-    // Foreign-key targets are created before the tables that reference them.
-    expect($threads)->toBeLessThan($messages)
-        ->and($threads)->toBeLessThan($participants);
-
-    // Each ALTER sorts after the CREATE of the table it alters.
-    expect($messages)->toBeLessThan($position('update_messaging_messages_table_with_parent'))
-        ->and($messages)->toBeLessThan($position('update_messaging_messages_table_with_type_and_meta'))
-        ->and($participants)->toBeLessThan($position('update_messaging_participants_table_with_last_read'))
-        ->and($participants)->toBeLessThan($position('update_messaging_participants_table_with_role'))
-        ->and($threads)->toBeLessThan($position('update_messaging_threads_table_with_archived_at'))
-        ->and($threads)->toBeLessThan($position('update_messaging_threads_table_with_direct_support'));
-});
-
-it('publishes timestamps that preserve the dependency order', function (): void {
-    $destinations = array_map(
-        static fn (string $target): string => basename($target),
-        array_values(ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-migrations')),
-    );
-
-    expect($destinations)->toHaveCount(9);
-
-    $sorted = $destinations;
-    sort($sorted);
-
-    // A host's migrator runs its database/migrations directory in filename order, so
-    // the published filenames must already sort into the dependency order.
-    expect($sorted)->toBe($destinations);
-
-    foreach ($destinations as $destination) {
-        expect($destination)->toMatch('/^\d{4}_\d{2}_\d{2}_\d{6}_\d{4}_(create|update)_messaging_\w+\.php$/');
-    }
+/**
+ * The driver-truth pin: the env-declared driver against what the connection itself answers.
+ * It makes a lying pgsql leg impossible — a base case decapitated by an un-parented
+ * `defineEnvironment()` override goes red here instead of quietly running SQLite and
+ * reporting itself green. It fires automatically rather than needing a human to read a skip
+ * count.
+ */
+it('runs on the driver the environment declared', function (): void {
+    expect(DatabaseDriver::current())->toBe(DatabaseDriver::from(DriverMatrix::driver()));
 });
