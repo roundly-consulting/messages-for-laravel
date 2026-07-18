@@ -96,6 +96,20 @@ it('paginates public threads', function () {
         ->toBe('Public announcement');
 });
 
+/**
+ * The order here changed with the tiebreak added to `ThreadsRepository::paginate()`, and the
+ * old expectation was an artifact rather than a contract.
+ *
+ * Both threads are created in the same second, so they tie on `last_activity_at` — the only
+ * column the listing sorted by. The order between them was therefore undefined, and this
+ * test passed for the package's life only because SQLite happened to return tied rows in
+ * physical insertion order. It asserted the *older* thread first from a list whose declared
+ * intent is newest-first, and it went red on Postgres roughly 1 run in 24.
+ *
+ * The listing now breaks ties on the uuid7 key, so the newest thread — 'Very secret
+ * channel', created second — sorts first, deterministically. See
+ * tests/Feature/ThreadOrderingTest.php for the determinism pin.
+ */
 it('paginates threads', function () {
     $user = User::create();
     $anotherUser = User::create();
@@ -115,9 +129,9 @@ it('paginates threads', function () {
         ->first()
         ->toBeInstanceOf(Thread::class)
         ->first()->name
-        ->toBe('Public announcement')
+        ->toBe('Very secret channel')
         ->last()->name
-        ->toBe('Very secret channel');
+        ->toBe('Public announcement');
 
     $threads = messaging()->threads()->paginate(participant: $anotherUser);
 

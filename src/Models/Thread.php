@@ -95,7 +95,9 @@ class Thread extends Model
     {
         return $query
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $participant))
-            ->latest('last_activity_at');
+            ->latest('last_activity_at')
+            // Deterministic tiebreak — see ThreadsRepository::paginate().
+            ->orderByDesc('id');
     }
 
     /**
@@ -131,6 +133,8 @@ class Thread extends Model
                 'messages as unread_count' => fn (Builder $q): Builder => self::applyUnreadFor($q, $participant),
             ])
             ->latest('last_activity_at')
+            // Deterministic tiebreak — see ThreadsRepository::paginate().
+            ->orderByDesc('id')
             ->withCasts(['unread_count' => 'integer']);
     }
 

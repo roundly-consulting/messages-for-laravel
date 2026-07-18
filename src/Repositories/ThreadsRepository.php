@@ -45,6 +45,11 @@ final class ThreadsRepository
 
         return $query
             ->latest('last_activity_at')
+            // `last_activity_at` ties constantly (second precision, stamped `now()`), and an
+            // unstable sort under LIMIT/OFFSET can show one thread on two pages and another
+            // on none. uuid7 keys are time-ordered, so `id` desc is a deterministic tiebreak
+            // that agrees with the newest-first intent above.
+            ->orderByDesc('id')
             ->paginate(
                 perPage: $perPage,
                 pageName: $pageName,
