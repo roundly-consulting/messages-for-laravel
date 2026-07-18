@@ -26,14 +26,13 @@ ArchPresets::strictTypes('RoundlyConsulting\Messages');
  *  - MessagesManager — the package's own FakeMessagesManager extends it, which is how
  *    `Messages::fake()` works. `final` would break a feature this package ships.
  */
-ArchPresets::finalByDefault('RoundlyConsulting\Messages')
-    ->ignoring([
-        Thread::class,
-        Message::class,
-        Participant::class,
-        NewMessageNotification::class,
-        MessagesManager::class,
-    ]);
+ArchPresets::finalByDefault('RoundlyConsulting\Messages', [
+    Thread::class,
+    Message::class,
+    Participant::class,
+    NewMessageNotification::class,
+    MessagesManager::class,
+]);
 
 /**
  * The counter-weight, and the fleet's 7×-shipped fatal. Also pins that each
