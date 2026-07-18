@@ -322,6 +322,11 @@ Messages::inboxFor($bob);                // see "Inbox" below
 — with the latest message (and its sender), participants, and a per-thread `unread_count`
 eager-loaded, so a chat sidebar renders without N+1 queries.
 
+Each thread carries a denormalised `last_message_id` pointer, so loading the latest message is a
+single indexed lookup per page rather than a scan of every message in every thread — the inbox
+stays flat as threads grow. The pointer is kept current automatically on every send, edit,
+unsend, restore and prune; you never maintain it.
+
 ```php
 $inbox = Messages::inboxFor($bob, perPage: 20);
 
