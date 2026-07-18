@@ -40,6 +40,15 @@ final class SendMessage
 
             $data->thread->touch('last_activity_at');
 
+            // `latestMessage` is a belongsTo over `threads.last_message_id`, so it answers from
+            // the thread instance's own attribute. The message's `created` hook has already
+            // written the pointer to the database — and a just-sent message is always the
+            // newest (stamped `now()`, greatest key), so that value is this message's id. The
+            // caller's `$data->thread` object still holds the pointer it was loaded with,
+            // though; catch it up with the same id, or `$thread->latestMessage` would report
+            // the thread as empty immediately after a successful send on it.
+            MessageModel::class()::applyLatestMessageTo($data->thread, $message->getKey());
+
             return $message;
         });
 

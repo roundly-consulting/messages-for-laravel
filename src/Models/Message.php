@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
 use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Concerns\HasMessageMedia;
+use RoundlyConsulting\Messages\Concerns\MaintainsThreadLatestMessage;
 use RoundlyConsulting\Messages\Database\Factories\MessageFactory;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
@@ -56,6 +57,7 @@ class Message extends Model implements HasMedia
     use HasFactory;
 
     use HasMessageMedia;
+    use MaintainsThreadLatestMessage;
     use SoftDeletes;
 
     protected $table = 'messaging_messages';

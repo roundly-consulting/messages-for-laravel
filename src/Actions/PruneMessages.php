@@ -27,8 +27,21 @@ final class PruneMessages
 
         $this->clearAttachments($query->clone());
 
+        // The threads about to lose messages, captured BEFORE the delete — afterwards the rows
+        // are gone and there is nothing left to ask.
+        $threadIds = $query->clone()->distinct()->pluck('thread_id')->all();
+
         // Bulk force-delete skips model events, so the forceDeleted cleanup hook never fires here.
-        return $query->forceDelete();
+        $pruned = $query->forceDelete();
+
+        // ...and for the same reason MaintainsThreadLatestMessage never fires either. A pruned
+        // thread whose newest message was just deleted would otherwise keep pointing at it, and
+        // the inbox would show a preview of a message that no longer exists.
+        foreach ($threadIds as $threadId) {
+            MessageModel::class()::syncLatestMessageFor($threadId);
+        }
+
+        return $pruned;
     }
 
     /**
