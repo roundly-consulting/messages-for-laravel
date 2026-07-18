@@ -43,7 +43,7 @@ it('never auto-loads its migrations', function (): void {
 it('publishes each migration into the host migrations directory under a timestamped name', function (): void {
     $paths = ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-migrations');
 
-    expect($paths)->toHaveCount(9);
+    expect($paths)->toHaveCount(11);
 
     foreach ($paths as $source => $target) {
         expect($source)->toEndWith('.php')

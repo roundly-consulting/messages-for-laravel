@@ -7,41 +7,42 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 
 /**
- * `Thread::latestMessage()` — the relation that was broken on every real engine.
+ * The two named regressions behind `Thread::latestMessage()`, kept as focused pins. The full
+ * behavioural table — every read path, every mutation, on bigint AND uuid AND ulid — lives in
+ * LatestMessageVectors; this file guards the two specific bugs the relation was rebuilt around
+ * so they stay named and findable.
  *
- * It used `latestOfMany()`, which resolves its winner with `MAX(<key>)`. The key here is a
- * uuid and Postgres ships no `max(uuid)` aggregate, so *every* read of this relation threw
- * `SQLSTATE[42883] function max(uuid) does not exist` — the inbox eager-load,
- * `latestMessagePreview()`, `MarkRead`, and `Participant::unreadCount()`. 23 tests died on
- * the pgsql leg the moment one existed. SQLite aggregates uuids as text without complaint,
- * which is the only reason 236 green tests never saw it.
+ * 1. `latestOfMany()` resolved its winner with `MAX(<key>)`, and `CanBeOneOfMany::ofMany()`
+ *    forces the primary key in as a tiebreak column. On the `uuid` key setting Postgres has no
+ *    `max(uuid)`, so every read threw `function max(uuid) does not exist`. That leg is proven
+ *    on real uuid keys in UuidKeyTest; the relation is now a plain `belongsTo` and aggregates
+ *    nothing.
+ * 2. The winner is the newest by `created_at`, not by key — a backfilled import has a newer
+ *    key but an older timestamp and must NOT win.
  *
- * These cases pin the two halves of the fix independently, so neither can rot:
- *  - the relation resolves at all (bites only on an engine with real uuid types);
- *  - it picks a deterministic winner when `created_at` ties (bites on every engine).
+ * The relation is now a `belongsTo` over the stored `threads.last_message_id` pointer, so it
+ * reads from the thread row's own column. These pins therefore read from a persisted thread
+ * (Thread::fresh()) — the pointer boundary itself is pinned in LatestMessagePointerTest.
  */
-it('resolves the latest message without aggregating over the uuid key', function (): void {
+afterEach(fn () => Carbon::setTestNow());
+
+it('resolves the latest message without an aggregate', function (): void {
     $thread = Thread::factory()->create();
 
     Message::factory()->inThread($thread)->create(['message' => 'first']);
     $newest = Message::factory()->inThread($thread)->create(['message' => 'second']);
 
-    // Reading the relation is the whole assertion on Postgres: `latestOfMany()` never got
-    // this far, it raised max(uuid) while building the join subquery.
-    expect($thread->latestMessage()->first()?->getKey())->toBe($newest->getKey())
-        ->and($thread->fresh()?->load('latestMessage')->latestMessage?->message)->toBe('second')
-        ->and($thread->latestMessagePreview())->toBe('second');
+    $fresh = $thread->fresh();
+
+    expect($fresh?->latestMessage()->first()?->getKey())->toBe($newest->getKey())
+        ->and($fresh?->load('latestMessage')->latestMessage?->message)->toBe('second')
+        ->and($fresh?->latestMessagePreview())->toBe('second');
 });
 
 /**
- * The tiebreak, and why it is not cosmetic: Laravel stores timestamps at second precision,
- * so messages sent in the same second share a `created_at`. Under a frozen clock — which is
- * this suite's normal state — *every* message in a thread ties.
- *
- * `id` desc resolves it correctly rather than arbitrarily because `HasUuids` mints
- * `Str::uuid7()`, which is time-ordered: within one `created_at`, the greater uuid is the
- * later message. Ordering on `created_at` alone would leave the winner to whatever the
- * engine happened to return first.
+ * Ties are the normal case, not the edge: second-precision timestamps under a frozen clock
+ * give every message one `created_at`, so the `id` desc tiebreak is the only thing deciding
+ * the winner. It is monotonic on every supported key type (sequence / uuid7 / ulid).
  */
 it('picks the last message deterministically when created_at ties', function (): void {
     Carbon::setTestNow('2026-07-18 12:00:00');
@@ -52,32 +53,28 @@ it('picks the last message deterministically when created_at ties', function ():
         ->inThread($thread)
         ->create(['message' => "tied {$i}"]));
 
-    // Precondition: the tie is real, not assumed — all five share one created_at.
     expect($messages->pluck('created_at')->map->format('Y-m-d H:i:s')->unique())->toHaveCount(1);
 
-    // uuid7 is monotonic, so the last-written row is the greatest key: the winner is the
-    // last message sent, not an arbitrary member of the tied set.
-    expect($thread->latestMessage()->first()?->getKey())->toBe($messages->last()->getKey())
-        ->and($thread->latestMessagePreview())->toBe('tied 5');
+    $fresh = $thread->fresh();
 
-    Carbon::setTestNow();
+    expect($fresh?->latestMessage()->first()?->getKey())->toBe($messages->last()->getKey())
+        ->and($fresh?->latestMessagePreview())->toBe('tied 5');
 });
 
 /**
  * The primary sort is `created_at`, not the key. A host that backfills history inserts old
- * messages *after* new ones, so their uuid7 keys are greater while their timestamps are
- * older. Sorting by key alone — which is what the old `MAX(id)` did — would call an imported
- * 2019 message the "latest".
+ * messages after new ones, so their keys are greater while their timestamps are older.
+ * Sorting by key alone — the old `MAX(id)` — would call an imported message the latest. The
+ * import fires model events, so the pointer follows the timestamp.
  */
 it('prefers the newest timestamp over the newest key', function (): void {
     $thread = Thread::factory()->create();
 
     $current = Message::factory()->inThread($thread)->create(['message' => 'sent today']);
 
-    // Backfilled afterwards: greater uuid7 key, older timestamp.
     $backfilled = Message::factory()->inThread($thread)->create(['message' => 'imported history']);
-    $backfilled->forceFill(['created_at' => now()->subYears(7)])->saveQuietly();
+    $backfilled->update(['created_at' => now()->subYears(7)]);
 
     expect($backfilled->getKey())->toBeGreaterThan($current->getKey())
-        ->and($thread->latestMessage()->first()?->getKey())->toBe($current->getKey());
+        ->and($thread->fresh()?->latestMessage()->first()?->getKey())->toBe($current->getKey());
 });

@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Tests\Fixtures\LatestMessageVectors;
 use RoundlyConsulting\Messages\Tests\Models\User;
 use RoundlyConsulting\Testing\Database\DriverMatrix;
 
@@ -84,3 +85,18 @@ it('cannot be stored in a bigint morph column — the cost of a non-bigint key',
     fn (): bool => DriverMatrix::driver() !== 'pgsql',
     'sqlite type affinity accepts the uuid silently — only a strict engine detects this',
 );
+
+/**
+ * The full latest-message vector table on the uuid key. The pointer's correctness must not
+ * depend on the key type: the recompute orders by `created_at` desc, `id` desc, and uuid7 is
+ * time-ordered, so the same answers hold here as on bigint.
+ *
+ * @see LatestMessageVectors
+ */
+afterEach(fn () => Carbon::setTestNow());
+
+it('resolves the latest message on uuid keys', function (callable $scenario): void {
+    [$thread, $expected] = $scenario();
+
+    LatestMessageVectors::assertScenario($thread, $expected);
+})->with(LatestMessageVectors::scenarios());

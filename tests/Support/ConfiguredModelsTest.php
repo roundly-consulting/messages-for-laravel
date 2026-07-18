@@ -56,11 +56,15 @@ it('falls back to the packaged model for a real model that is not ours', functio
 /**
  * REGRESSION — the appointments (#19) bug, live in this package.
  *
- * `Thread::participants()` / `messages()` / `latestMessage()` were declared without an
- * explicit foreign key, so Eloquent derived it from the *parent's class name*. With a host
- * subclass configured in `messages.models.thread`, every relation looked for
- * `custom_thread_id` instead of `thread_id` and every insert and read broke — while the
- * default path stayed green, which is why it went unnoticed.
+ * `Thread::participants()` / `messages()` were declared without an explicit foreign key, so
+ * Eloquent derived it from the *parent's class name*. With a host subclass configured in
+ * `messages.models.thread`, every relation looked for `custom_thread_id` instead of
+ * `thread_id` and every insert and read broke — while the default path stayed green, which is
+ * why it went unnoticed.
+ *
+ * `latestMessage()` is a `belongsTo` over the thread's own `last_message_id` pointer. It takes
+ * an explicit key for the same reason: left implicit, Eloquent derives `latest_message_id`
+ * from the relation method name.
  */
 describe('a configured thread subclass', function (): void {
     beforeEach(function (): void {
@@ -74,7 +78,7 @@ describe('a configured thread subclass', function (): void {
 
         expect($thread->participants()->getForeignKeyName())->toBe('thread_id')
             ->and($thread->messages()->getForeignKeyName())->toBe('thread_id')
-            ->and($thread->latestMessage()->getForeignKeyName())->toBe('thread_id');
+            ->and($thread->latestMessage()->getForeignKeyName())->toBe('last_message_id');
     });
 
     it('starts a thread, adds participants and sends messages through the subclass', function (): void {

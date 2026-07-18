@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Carbon\Carbon;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Tests\Fixtures\LatestMessageVectors;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 /** The seam's ulid leg. @see UuidKeyTest */
@@ -40,3 +41,18 @@ it('keeps the id desc tiebreak monotonic on ulid keys', function (): void {
 
     Carbon::setTestNow();
 });
+
+/**
+ * The full latest-message vector table on the ulid key. `Str::ulid()` is time-ordered with a
+ * monotonic within-millisecond counter, so the `id` desc tiebreak holds and the pointer lands
+ * on the same answers as bigint and uuid.
+ *
+ * @see LatestMessageVectors
+ */
+afterEach(fn () => Carbon::setTestNow());
+
+it('resolves the latest message on ulid keys', function (callable $scenario): void {
+    [$thread, $expected] = $scenario();
+
+    LatestMessageVectors::assertScenario($thread, $expected);
+})->with(LatestMessageVectors::scenarios());
