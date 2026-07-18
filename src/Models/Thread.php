@@ -169,10 +169,43 @@ class Thread extends Model
         return $this->hasMany(MessageModel::class(), 'thread_id');
     }
 
-    /** @return HasOne<Message, $this> */
+    /**
+     * The thread's newest message.
+     *
+     * Deliberately ordered rather than `latestOfMany()`. `CanBeOneOfMany::ofMany()`
+     * resolves its winner with an aggregate **and unconditionally adds the primary key as
+     * the tiebreak column**:
+     *
+     * ```php
+     * $columns = is_string($columns = $column) ? [$column => $aggregate, $keyName => $aggregate] : $column;
+     * if (! array_key_exists($keyName, $columns)) { $columns[$keyName] = 'MAX'; }
+     * ```
+     *
+     * This model's key is a uuid, and Postgres ships no `max(uuid)`/`min(uuid)` aggregate,
+     * so every read of this relation raised `function max(uuid) does not exist` on a real
+     * engine — `latestMessagePreview()`, the inbox eager-load, and `MarkRead` alike. SQLite
+     * compares uuids as text and aggregates them happily, which is the only reason the suite
+     * never saw it. `latestOfMany('created_at')` does **not** fix it: the key is still forced
+     * in, so the subquery keeps `MAX("id")`.
+     *
+     * Ordering needs no aggregate and is identical on every engine:
+     *  - `created_at` desc is the real intent — the newest message by time. It is the primary
+     *    sort so a backfilled/imported history sorts by when it was *sent*, not by when the
+     *    row happened to be inserted.
+     *  - `id` desc breaks ties, and is not an arbitrary tiebreak: {@see HasUuids} mints
+     *    `Str::uuid7()`, which is time-ordered, so within one `created_at` the greater uuid is
+     *    genuinely the later message. Ties are the normal case, not the edge — Laravel stores
+     *    timestamps at second precision, and a suite with `Carbon::setTestNow()` frozen gives
+     *    every message the same instant. Without the tiebreak the winner would be whatever the
+     *    engine returned first.
+     *
+     * @return HasOne<Message, $this>
+     */
     public function latestMessage(): HasOne
     {
-        return $this->hasOne(MessageModel::class(), 'thread_id')->latestOfMany();
+        return $this->hasOne(MessageModel::class(), 'thread_id')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     /**
