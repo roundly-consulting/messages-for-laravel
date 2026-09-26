@@ -15,6 +15,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function (): void {
     Storage::fake('public');
+    Storage::fake('local');
 });
 
 function sentMessage(): Message

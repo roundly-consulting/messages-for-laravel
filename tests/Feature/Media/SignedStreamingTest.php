@@ -11,6 +11,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function (): void {
     Storage::fake('public');
+    Storage::fake('local');
 
     // Store attachments on a real local disk (no native temporaryUrl) so the signed streaming
     // route is exercised, exactly as a private DM disk behaves in production.

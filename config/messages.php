@@ -66,8 +66,16 @@ return [
         // The media-library bucket message attachments are stored in.
         'attachments_bucket' => 'attachments',
 
-        // Disk for attachment originals. null = media-library's default disk.
+        // Disk for attachments, whatever their visibility. null = chosen by visibility:
+        // private attachments go to 'private_disk' below, public ones to media-library's
+        // default disk ('public' out of the box).
         'disk' => env('MESSAGES_MEDIA_DISK', null),
+
+        // Disk for PRIVATE attachments (originals and variants) when 'disk' is null. It must
+        // not be web-served — media-library's default 'public' disk is (under /storage once
+        // `storage:link` runs), which would make a private DM attachment reachable without a
+        // signature. Laravel's 'local' disk (storage/app/private) is not; a private S3 disk works.
+        'private_disk' => env('MESSAGES_MEDIA_PRIVATE_DISK', 'local'),
 
         // Attachments are private by default and reachable only through media's signed
         // streaming route. Set to 'public' to expose direct URLs (not recommended for DMs).

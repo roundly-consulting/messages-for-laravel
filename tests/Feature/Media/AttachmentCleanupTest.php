@@ -14,6 +14,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function (): void {
     Storage::fake('public');
+    Storage::fake('local');
     config()->set('messages.media.disk', 'secure');
     Storage::disk('secure')->deleteDirectory('');
 });

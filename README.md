@@ -188,6 +188,9 @@ Messages carry first-class file attachments backed by media-library. Each messag
 `attachments` bucket: images get a responsive width ladder, any other file type (PDF, zip, …) is
 stored as a passthrough original. Attachments are **private by default** and reachable only through
 media-library's signed, short-lived streaming URLs — regardless of whether the thread is public.
+To keep the signed URL the only way in, private attachments (and their variants) are stored on
+`messages.media.private_disk` — Laravel's non-public `local` disk by default — never on
+media-library's default `public` disk, which `php artisan storage:link` serves under `/storage`.
 
 media-library is a hard dependency, so there is nothing to opt into; install it alongside messages
 and configure a disk:
@@ -257,7 +260,8 @@ Force-deleting a message (hard delete / prune) removes its attachment files; sof
 // config/messages.php
 'media' => [
     'attachments_bucket'      => 'attachments', // media-library bucket name
-    'disk'                    => env('MESSAGES_MEDIA_DISK', null),       // null = media default disk
+    'disk'                    => env('MESSAGES_MEDIA_DISK', null),       // null = by visibility (below)
+    'private_disk'            => env('MESSAGES_MEDIA_PRIVATE_DISK', 'local'), // private attachments when 'disk' is null
     'visibility'              => env('MESSAGES_MEDIA_VISIBILITY', 'private'), // 'private' | 'public'
     'accepted_mime_types'     => [],            // [] = accept any file
     'max_file_size'           => null,          // bytes; null = media default
@@ -267,6 +271,9 @@ Force-deleting a message (hard delete / prune) removes its attachment files; sof
     'cleanup_on_force_delete' => true,          // remove files on hard delete / prune
 ],
 ```
+
+An explicit `disk` is used for every attachment whatever its visibility, so keep it non-public
+while attachments are private; `private_disk` can point at any non-public disk (e.g. private S3).
 
 ## Notifications
 
