@@ -457,10 +457,11 @@ return MessageResource::collection($thread->messages()->with('sender')->paginate
 
 Publish them into your app to customise (`vendor:publish --tag=messages-resources`).
 
-## Low-level service (backward compatible)
+## Low-level service
 
-The original `messaging()` helper, `MessagingService`, and the three repositories still work
-unchanged and now also dispatch the events above:
+The `messaging()` helper returns a `MessagingService` with three repositories — threads,
+participants and messages — for code that prefers a service over the facade. They run the same
+actions, so they dispatch the events above:
 
 ```php
 $thread = messaging()->threads()->create(name: 'General', isPublic: true);
