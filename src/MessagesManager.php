@@ -103,12 +103,15 @@ class MessagesManager
      * The participant's threads as an optimised inbox: newest activity first, with the
      * latest message, participants, and per-thread unread counts eager loaded.
      *
+     * A null `$page` reads the current page from the request (`?page=`, or `?{$pageName}=`),
+     * exactly like Eloquent's own `paginate()`.
+     *
      * @return LengthAwarePaginator<int, Thread>
      */
     public function inboxFor(
         Model $participant,
         int $perPage = 15,
-        int $page = 1,
+        ?int $page = null,
         string $pageName = 'page',
     ): LengthAwarePaginator {
         return ThreadModel::class()::query()
@@ -119,14 +122,14 @@ class MessagesManager
     /**
      * Threads visible to the model — the ones it takes part in plus every public thread — or
      * only the public threads when no model is given. Newest activity first, latest message
-     * and its sender eager loaded.
+     * and its sender eager loaded. A null `$page` reads the current page from the request.
      *
      * @return LengthAwarePaginator<int, Thread>
      */
     public function threads(
         ?Model $for = null,
         int $perPage = 15,
-        int $page = 1,
+        ?int $page = null,
         string $pageName = 'page',
     ): LengthAwarePaginator {
         return ThreadModel::class()::query()

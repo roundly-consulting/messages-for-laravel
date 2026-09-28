@@ -81,11 +81,12 @@ final readonly class ThreadHandle
     }
 
     /**
-     * The thread's messages, newest first, each with its sender eager loaded.
+     * The thread's messages, newest first, each with its sender eager loaded. A null `$page`
+     * reads the current page from the request (`?page=`, or `?{$pageName}=`).
      *
      * @return LengthAwarePaginator<int, Message>
      */
-    public function messages(int $perPage = 15, int $page = 1, string $pageName = 'page'): LengthAwarePaginator
+    public function messages(int $perPage = 15, ?int $page = null, string $pageName = 'page'): LengthAwarePaginator
     {
         return $this->thread->messages()
             ->with('sender')

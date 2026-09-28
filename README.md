@@ -160,13 +160,13 @@ Messages::thread($thread)->message($message)->edit($request->body, by: $request-
 | `send(Thread, ?Model $sender, string $body)` | `Message` | `SendMessage` |
 | `markRead(Thread, Model)` | `Participant` | `MarkRead` |
 | `unreadCount(Model, ?Thread)` | `int` | — |
-| `inboxFor(Model, perPage, page, pageName)` | `LengthAwarePaginator<Thread>` | — |
-| `threads(?Model $for, perPage, page, pageName)` | `LengthAwarePaginator<Thread>` | — |
+| `inboxFor(Model, perPage, ?page, pageName)` | `LengthAwarePaginator<Thread>` | — |
+| `threads(?Model $for, perPage, ?page, pageName)` | `LengthAwarePaginator<Thread>` | — |
 | `thread(Thread)` | `ThreadHandle` | — |
 | `thread()->rename(?string, by:)` / `archive(by:)` | `Thread` | `RenameThread` / `ArchiveThread` |
 | `thread()->markRead(Model)` | `Participant` | `MarkRead` |
 | `thread()->typing(Model)` | `void` | `SignalTyping` |
-| `thread()->messages(perPage, page, pageName)` | `LengthAwarePaginator<Message>` | — |
+| `thread()->messages(perPage, ?page, pageName)` | `LengthAwarePaginator<Message>` | — |
 | `thread()->message(Message)` | `MessageHandle` | — (refuses other threads) |
 | `thread()->participants()->add(Model, ?ParticipantRole, by:)` | `Participant` (existing row if already in) | `AddParticipant` |
 | `thread()->participants()->remove(Model, by:)` / `leave(Model)` | `void` | `RemoveParticipant` / `LeaveThread` |
@@ -174,6 +174,9 @@ Messages::thread($thread)->message($message)->edit($request->body, by: $request-
 | `thread()->participants()->transferOwnership(from:, to:)` | `Participant` | `TransferOwnership` |
 | `message(Message)->edit(string, by:)` / `delete(by:)` | `Message` | `EditMessage` / `DeleteMessage` |
 | `prune(?int $days, ?Thread)` | `int` | `PruneMessages` |
+
+The three listings read the current page from the request (`?page=`, or `?{pageName}=`) like
+Eloquent's own `paginate()`; pass `page:` to pin one explicitly.
 
 ### Without the facade
 
@@ -607,6 +610,9 @@ use RoundlyConsulting\Messages\Http\Resources\ParticipantResource;
 return ThreadResource::collection(Messages::inboxFor($request->user()));
 return MessageResource::collection(Messages::thread($thread)->messages());
 ```
+
+Both paginators follow the request's `?page=`, so the envelope's `meta.current_page` and its
+`links.next` stay in step for an infinite-scroll client.
 
 Publish them into your app to customise (`vendor:publish --tag=messages-resources`).
 
