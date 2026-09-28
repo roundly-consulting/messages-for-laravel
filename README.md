@@ -53,7 +53,8 @@ php artisan vendor:publish --tag="messages-translations"
 ```
 
 The package ships three tables — `messaging_threads`, `messaging_participants`, and
-`messaging_messages` — all with UUID primary keys and soft deletes.
+`messaging_messages` — all with soft deletes and a configurable key type (`bigint` by default,
+see [Key types](#key-types)).
 
 ## Preparing your models
 
@@ -81,7 +82,168 @@ class User extends Model implements ParticipatesInMessaging
 ```
 
 Participation is polymorphic, so different model types (a `User` and a `Company`) can share the
-same conversation.
+same conversation. The trait's writes go through the `MessagesManager`, so `Messages::fake()`
+records them like facade calls.
+
+## Usage
+
+Everything is one API in three layers that run the same code: the `Messages` facade, the
+injectable `MessagesManager` behind it, and the action classes that hold the behaviour.
+
+### The `Messages` facade
+
+```php
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
+use RoundlyConsulting\Messages\Facades\Messages;
+
+// Start a conversation — the first participant owns a group thread
+$thread = Messages::start('Launch')
+    ->public()                 // ->private(), ->direct(), ->everyoneCanJoin()
+    ->withParticipants([$alice, $bob])
+    ->create();
+
+// Direct messages: one thread per pair, found or created
+$dm = Messages::direct($alice, $bob);
+
+// Send
+Messages::to($thread)->from($alice)->send('Hello');   // + replyingTo(), withAttachment(), attach()
+Messages::send($thread, $alice, 'Hello');             // plain text shortcut
+
+// Read state, inbox and listings
+Messages::markRead($thread, $bob);
+Messages::unreadCount($bob);                  // across all threads, or pass a thread
+Messages::inboxFor($bob, perPage: 20);        // see "Inbox" below
+Messages::threads($bob, perPage: 25);         // $bob's threads + public ones; threads() = public only
+
+// One thread
+Messages::thread($thread)->rename('Launch crew', by: $alice);
+Messages::thread($thread)->archive(by: $alice);
+Messages::thread($thread)->markRead($bob);
+Messages::thread($thread)->typing($bob);      // broadcast-only, see Broadcasting
+Messages::thread($thread)->messages(perPage: 25);   // newest first, senders eager loaded
+
+// Its participants
+Messages::thread($thread)->participants()->add($carol, ParticipantRole::Admin, by: $alice);
+Messages::thread($thread)->participants()->setRole($carol, ParticipantRole::Member, by: $alice);
+Messages::thread($thread)->participants()->remove($carol, by: $alice);
+Messages::thread($thread)->participants()->leave($bob);
+Messages::thread($thread)->participants()->transferOwnership(from: $alice, to: $bob);
+
+// One message
+Messages::message($message)->edit('fixed typo', by: $alice);   // author only
+Messages::message($message)->delete(by: $alice);               // author, or a manager
+
+// Housekeeping
+Messages::prune(days: 30);                    // defaults to messages.prune.days
+```
+
+`by:` is the acting participant; it is checked against the thread's roles (see below). Leave it
+out for trusted server-side calls — no check runs.
+
+**Scoped handles refuse other threads.** `Messages::thread($thread)->message($message)` throws a
+`MessageException` when the message belongs to another thread, and every participants method
+accepts either the participating model or its `Participant` row — a row from another thread
+throws a `ParticipationException`. Prefer the scoped form whenever the thread and the message
+both come from the request:
+
+```php
+// PATCH /threads/{thread}/messages/{message}
+Messages::thread($thread)->message($message)->edit($request->body, by: $request->user());
+```
+
+| Method | Returns | Action |
+|---|---|---|
+| `start(?string $name)` → `PendingThread::create()` | `Thread` | `StartThread` |
+| `to(Thread)` → `PendingMessage::send(?string $body)` | `Message` | `SendMessage` |
+| `direct(Model, Model)` | `Thread` | `FindOrCreateDirectThread` |
+| `send(Thread, ?Model $sender, string $body)` | `Message` | `SendMessage` |
+| `markRead(Thread, Model)` | `Participant` | `MarkRead` |
+| `unreadCount(Model, ?Thread)` | `int` | — |
+| `inboxFor(Model, perPage, page, pageName)` | `LengthAwarePaginator<Thread>` | — |
+| `threads(?Model $for, perPage, page, pageName)` | `LengthAwarePaginator<Thread>` | — |
+| `thread(Thread)` | `ThreadHandle` | — |
+| `thread()->rename(?string, by:)` / `archive(by:)` | `Thread` | `RenameThread` / `ArchiveThread` |
+| `thread()->markRead(Model)` | `Participant` | `MarkRead` |
+| `thread()->typing(Model)` | `void` | `SignalTyping` |
+| `thread()->messages(perPage, page, pageName)` | `LengthAwarePaginator<Message>` | — |
+| `thread()->message(Message)` | `MessageHandle` | — (refuses other threads) |
+| `thread()->participants()->add(Model, ?ParticipantRole, by:)` | `Participant` | `AddParticipant` |
+| `thread()->participants()->remove(Model, by:)` / `leave(Model)` | `void` | `RemoveParticipant` / `LeaveThread` |
+| `thread()->participants()->setRole(Model, ParticipantRole, by:)` | `Participant` | `SetParticipantRole` |
+| `thread()->participants()->transferOwnership(from:, to:)` | `Participant` | `TransferOwnership` |
+| `message(Message)->edit(string, by:)` / `delete(by:)` | `Message` | `EditMessage` / `DeleteMessage` |
+| `prune(?int $days, ?Thread)` | `int` | `PruneMessages` |
+
+### Without the facade
+
+Inject the manager — the same API, no facade:
+
+```php
+use RoundlyConsulting\Messages\MessagesManager;
+
+final class ThreadController
+{
+    public function __construct(private MessagesManager $messages) {}
+
+    public function rename(Thread $thread, Request $request): Thread
+    {
+        return $this->messages->thread($thread)->rename($request->name, by: $request->user());
+    }
+}
+```
+
+Or run an action yourself — each one is container-resolvable, takes a DTO or plain arguments,
+and dispatches its event:
+
+```php
+use RoundlyConsulting\Messages\Actions\EditMessage;
+use RoundlyConsulting\Messages\DataTransferObjects\EditMessageData;
+
+app(EditMessage::class)->execute(new EditMessageData($message, 'fixed typo', actor: $alice));
+```
+
+Actions called directly bypass `Messages::fake()`; the facade, the manager and the model traits
+all go through it.
+
+### Testing with `Messages::fake()`
+
+```php
+use RoundlyConsulting\Messages\Facades\Messages;
+
+$fake = Messages::fake();
+
+$alice->sendMessageTo($thread, 'Hi');                          // model traits are recorded too
+Messages::thread($thread)->rename('Launch', by: $alice);
+
+$fake->assertSent('Hi', to: $thread);
+$fake->assertThreadRenamed($thread, to: 'Launch');
+$fake->assertNothingDeleted();
+```
+
+The fake is a `MessagesManager` subtype, so constructor-injected managers receive it too. It
+**still performs** every operation — rows are written, events fire — and records each one that
+succeeds, whichever door it came through. Available assertions (each with an `assertNothing…`
+counterpart):
+
+| Assertion | Recorded by |
+|---|---|
+| `assertThreadCreated(?name)` / `assertNothingCreated()` | `start()->create()`, a `direct()` that had to create the thread |
+| `assertSent(?body, ?to)` / `assertSentCount(n)` / `assertNothingSent()` | `to()->send()`, `send()`, `sendMessageTo()` |
+| `assertThreadRenamed(thread, ?to)` / `assertNothingRenamed()` | `thread()->rename()` |
+| `assertThreadArchived(thread)` / `assertNothingArchived()` | `thread()->archive()` |
+| `assertMarkedRead(thread, ?by)` / `assertNothingMarkedRead()` | `markRead()`, `markThreadRead()`, `markReadFor()`, `markAsRead()` |
+| `assertTyping(thread, ?participant)` / `assertNothingTyping()` | `thread()->typing()`, `$thread->typing()` |
+| `assertParticipantAdded(thread, ?participant)` / `assertNothingAdded()` | `participants()->add()`, `joinThread()` |
+| `assertParticipantRemoved(thread, ?participant)` / `assertNothingRemoved()` | `participants()->remove()` / `leave()` |
+| `assertRoleChanged(thread, ?participant, ?role)` / `assertNothingRoleChanged()` | `participants()->setRole()` |
+| `assertOwnershipTransferred(thread, ?to)` / `assertNothingTransferred()` | `participants()->transferOwnership()` |
+| `assertEdited(message, ?body)` / `assertNothingEdited()` | `message()->edit()` |
+| `assertDeleted(message)` / `assertNothingDeleted()` | `message()->delete()` |
+| `assertPruned(?days)` / `assertNothingPruned()` | `prune()` |
+
+`$fake->recorded(?MessagingOperation)` returns every recorded `MessagingCall` for custom checks.
+Work an action does on its own behalf — the participants `start()` adds, system messages — is
+not recorded separately.
 
 ## Direct messages (1:1)
 
@@ -120,34 +282,28 @@ participants, rename and archive the thread, and moderate anyone's messages; mem
 manage their own messages.
 
 ```php
-use RoundlyConsulting\Messages\Actions\SetParticipantRole;
-use RoundlyConsulting\Messages\Actions\TransferOwnership;
-use RoundlyConsulting\Messages\DataTransferObjects\SetParticipantRoleData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
+use RoundlyConsulting\Messages\Facades\Messages;
 
 $thread->roleOf($bob);            // ParticipantRole::Member|Admin|Owner|null
 $thread->canManage($bob);         // bool
 
-app(SetParticipantRole::class)->execute(new SetParticipantRoleData(
-    thread: $thread, participant: $bob, role: ParticipantRole::Admin, actor: $alice,
-));
+$participants = Messages::thread($thread)->participants();
 
-app(TransferOwnership::class)->execute($thread, $alice, $bob); // $alice is demoted to admin
+$participants->setRole($bob, ParticipantRole::Admin, by: $alice);
+$participants->transferOwnership(from: $alice, to: $bob); // $alice is demoted to admin
 ```
 
 Enforcement is opt-out via `messages.permissions.enabled` (default `true`) and is **skipped for
 direct threads**, which are always roleless. When an actor lacks the required role the action
 throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`. Passing no
-`actor` skips the check, so trusted server-side code keeps working unchanged.
+`by:` actor skips the check, so trusted server-side code keeps working unchanged.
 
-Renaming and archiving are first-class actions:
+Renaming and archiving:
 
 ```php
-use RoundlyConsulting\Messages\Actions\RenameThread;
-use RoundlyConsulting\Messages\Actions\ArchiveThread;
-
-app(RenameThread::class)->execute($thread, 'New name', $alice);
-app(ArchiveThread::class)->execute($thread, $alice);
+Messages::thread($thread)->rename('New name', by: $alice);
+Messages::thread($thread)->archive(by: $alice);
 $thread->isArchived();   // true
 ```
 
@@ -308,32 +464,6 @@ MESSAGES_NOTIFICATIONS=true
 Point `notifications.notification` at your own class (or publish the default with
 `vendor:publish --tag=messages-notifications`) to customise channels and content.
 
-## The `Messages` facade
-
-A fluent facade is layered over the same logic for call-site ergonomics.
-
-```php
-use RoundlyConsulting\Messages\Facades\Messages;
-
-// Fluent thread creation
-$thread = Messages::thread('Project X')
-    ->public()                 // ->private(), ->direct()
-    ->everyoneCanJoin()
-    ->withParticipants([$alice, $bob])
-    ->create();
-
-// Fluent message send
-Messages::to($thread)->from($alice)->send('Hello');
-
-// Direct passthroughs
-Messages::direct($alice, $bob);          // find-or-create a DM
-Messages::between($alice, $bob);         // alias of direct()
-Messages::send($thread, $alice, 'Hello');
-Messages::markRead($thread, $bob);
-Messages::unreadCount($bob);             // global, or pass a thread
-Messages::inboxFor($bob);                // see "Inbox" below
-```
-
 ## Inbox
 
 `Messages::inboxFor()` returns a paginator of the participant's threads — newest activity first
@@ -357,7 +487,7 @@ foreach ($inbox as $thread) {
 A few thread helpers complement it:
 
 ```php
-$thread->markReadFor($bob);          // mark read on behalf of a participant
+$thread->markReadFor($bob);          // same as Messages::markRead($thread, $bob)
 $thread->latestMessagePreview();     // null when the thread is empty
 $message->isReadBy($bob);            // has $bob read up to this message?
 ```
@@ -371,7 +501,7 @@ $thread->unreadCountFor($user);   // messages $user hasn't read (excludes their 
 $thread->seenBy($message);        // participants whose read pointer is at/after $message
 
 $participant->hasUnread();
-$participant->markAsRead();
+$participant->markAsRead();       // same as Messages::markRead() for that participant
 ```
 
 A message is unread for a participant when it was created after their last-read pointer (or
@@ -380,16 +510,14 @@ they have never read the thread) and they are not its sender.
 ## Editing, unsending & system messages
 
 ```php
-use RoundlyConsulting\Messages\Actions\EditMessage;
-use RoundlyConsulting\Messages\Actions\DeleteMessage;
-use RoundlyConsulting\Messages\DataTransferObjects\EditMessageData;
-
-app(EditMessage::class)->execute(new EditMessageData($message, 'edited body'));
-app(DeleteMessage::class)->execute($message); // soft delete ("unsent")
+Messages::message($message)->edit('edited body', by: $alice);
+Messages::message($message)->delete(by: $alice); // soft delete ("unsent")
 ```
 
-Editing or deleting an already-deleted message throws a typed
-`RoundlyConsulting\Messages\Exceptions\MessageException`.
+Only the **author** may edit a message — not even an owner or admin, and regardless of
+`messages.permissions.enabled`. Deleting is allowed to the author and, in a group thread with
+roles enforced, to owners and admins. Editing or deleting an already-deleted message throws a
+typed `RoundlyConsulting\Messages\Exceptions\MessageException`.
 
 Enable system messages (e.g. "Alice joined") with `messages.system-messages.enabled`. They are
 stored as a `MessageType::System` message with a translation key as the body and the parameters
@@ -398,20 +526,25 @@ in the `meta` JSON column, so they render correctly in any locale.
 ## The action & DTO layer
 
 All writes funnel through small, container-resolvable actions that accept DTOs and dispatch the
-matching event. Advanced consumers can use them directly:
+matching event. The facade reaches every one of them (see the table under [Usage](#usage));
+advanced consumers can also run them directly:
 
-| Action | DTO |
+| Action | Input |
 |---|---|
 | `StartThread` | `CreateThreadData` |
 | `SendMessage` | `SendMessageData` |
-| `AddParticipant` / `RemoveParticipant` / `LeaveThread` | `AddParticipantData` |
+| `AddParticipant` | `AddParticipantData` (+ optional actor) |
+| `RemoveParticipant` | `RemoveParticipantData` (+ optional actor) |
+| `LeaveThread` | thread + participant |
 | `MarkRead` | `MarkReadData` |
-| `EditMessage` | `EditMessageData` |
+| `EditMessage` | `EditMessageData` (+ optional actor, must be the author) |
 | `DeleteMessage` | `Message` (+ optional actor) |
 | `FindOrCreateDirectThread` | two models |
 | `SetParticipantRole` | `SetParticipantRoleData` |
 | `TransferOwnership` | thread + current/new owner |
 | `RenameThread` / `ArchiveThread` | thread (+ optional actor) |
+| `SignalTyping` | thread + participant |
+| `PruneMessages` | `PruneMessagesData` |
 
 ## Events
 
@@ -453,23 +586,10 @@ use RoundlyConsulting\Messages\Http\Resources\MessageResource;
 use RoundlyConsulting\Messages\Http\Resources\ParticipantResource;
 
 return ThreadResource::collection(Messages::inboxFor($request->user()));
-return MessageResource::collection($thread->messages()->with('sender')->paginate());
+return MessageResource::collection(Messages::thread($thread)->messages());
 ```
 
 Publish them into your app to customise (`vendor:publish --tag=messages-resources`).
-
-## Low-level service
-
-The `messaging()` helper returns a `MessagingService` with three repositories — threads,
-participants and messages — for code that prefers a service over the facade. They run the same
-actions, so they dispatch the events above:
-
-```php
-$thread = messaging()->threads()->create(name: 'General', isPublic: true);
-messaging()->participants()->addParticipantToThread($thread, $user);
-messaging()->messages()->sendMessage($thread, $user, 'Hi!');
-$messages = messaging()->messages()->paginate(thread: $thread, perPage: 25);
-```
 
 ## Configuration
 
@@ -581,8 +701,9 @@ Channel and event names are fully configurable.
 - `messaging.participant.{name}.{id}` — private per-participant channel for private threads.
 - `messaging.thread.{id}` — per-thread channel for participant and message events.
 
-Broadcast a live typing indicator with `$thread->typing($user)` — it only broadcasts (never
-persists) and respects `broadcasting.enabled`.
+Broadcast a live typing indicator with `Messages::thread($thread)->typing($user)` (or
+`$thread->typing($user)`) — it only broadcasts (never persists) and respects
+`broadcasting.enabled`.
 
 ## Pruning old messages
 
@@ -591,18 +712,12 @@ php artisan messages:prune --days=30          # defaults to MESSAGES_PRUNE_DAYS
 php artisan messages:prune --thread={uuid}    # limit to one thread
 ```
 
+Or from code: `Messages::prune(days: 30, thread: $thread)` returns how many were removed.
+
 ## Testing helpers
 
-```php
-use RoundlyConsulting\Messages\Facades\Messages;
-
-$fake = Messages::fake();
-
-Messages::send($thread, $user, 'Hi');
-
-$fake->assertSent('Hi');
-$fake->assertSentCount(1);
-```
+`Messages::fake()` and its assertions are covered under
+[Testing with `Messages::fake()`](#testing-with-messagesfake).
 
 Factories ship handy states: `Thread::factory()->direct()/public()/private()`,
 `Message::factory()->system()`, and `Participant::factory()->read()/unread()`.

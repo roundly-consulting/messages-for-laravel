@@ -12,9 +12,14 @@ Initial public release.
 
 - Direct messages and group conversations between any Eloquent models via the `HasMessaging`
   trait: `conversationWith()`, `startConversationWith()`, `sendMessageTo()`.
-- A `Messages` facade for threads, sending, read state and the inbox, backed by
-  container-resolvable actions and DTOs.
+- A `Messages` facade over an injectable `MessagesManager` that reaches every action:
+  `start()`, `to()`, `direct()`, `send()`, `markRead()`, `unreadCount()`, `inboxFor()`,
+  `threads()`, `prune()`; a `thread($t)` handle (`rename()`, `archive()`, `markRead()`,
+  `typing()`, `messages()`, `message()`) with `participants()` (`add()`, `remove()`,
+  `leave()`, `setRole()`, `transferOwnership()`); and a `message($m)` handle (`edit()`,
+  `delete()`). Scoped handles refuse a message or participant row of another thread.
 - Owner, admin and member roles in group threads, with ownership transfer, renaming and archiving.
+  Only a message's author may edit it; owners and admins may delete others' messages.
 - Read receipts and unread counts per thread or overall.
 - Replies that keep a snapshot of the quoted message, plus editing, unsending and translatable
   system messages.
@@ -26,4 +31,9 @@ Initial public release.
   optional real-time broadcasting and live typing indicators.
 - Opt-in Laravel notifications for new messages, JSON API resources and query scopes.
 - `php artisan messages:prune` to delete old messages.
-- `Messages::fake()`, model factories and Pest expectations for testing your app.
+- `Messages::fake()`: a still-performing `MessagesManager` subtype that records every
+  operation — through the facade, an injected manager, the builders, the handles and the model
+  traits — with `assertThreadCreated/Sent/ThreadRenamed/ThreadArchived/MarkedRead/Typing/
+  ParticipantAdded/ParticipantRemoved/RoleChanged/OwnershipTransferred/Edited/Deleted/Pruned`
+  and an `assertNothing…` for each.
+- Model factories and Pest expectations for testing your app.
