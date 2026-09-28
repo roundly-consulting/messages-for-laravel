@@ -38,18 +38,31 @@ final class StartThread
             'last_activity_at' => now(),
         ]);
 
-        $thread->save();
+        // The thread and its participants land together, and nobody hears about the thread
+        // until it has them. The model's own `created` broadcast would run inside save(), before
+        // any participant exists: a private thread (one channel per participant) reached nobody,
+        // and a ThreadCreated listener saw an empty thread. So the save is kept quiet and the
+        // thread is announced below, once it is whole.
+        $thread->getConnection()->transaction(function () use ($thread, $data, $model): void {
+            $model::withoutBroadcasting(static fn (): bool => $thread->save());
+
+            // The first participant is the creator and becomes owner of a group thread.
+            foreach ($data->participants as $index => $participant) {
+                $this->addParticipant->execute(new AddParticipantData(
+                    thread: $thread,
+                    participant: $participant,
+                    role: $this->roleForIndex($data, $index),
+                ));
+            }
+        });
+
+        // Nothing above should have cached the relation, but a stale empty one would lock the
+        // owner out of their own thread — `participationOf()` answers from a loaded relation.
+        $thread->unsetRelation('participants');
 
         Event::dispatch(new ThreadCreated($thread));
 
-        // The first participant is the creator and becomes owner of a group thread.
-        foreach ($data->participants as $index => $participant) {
-            $this->addParticipant->execute(new AddParticipantData(
-                thread: $thread,
-                participant: $participant,
-                role: $this->roleForIndex($data, $index),
-            ));
-        }
+        $thread->broadcastCreated();
 
         return $thread;
     }

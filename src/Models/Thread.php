@@ -372,7 +372,11 @@ class Thread extends Model
 
         $template = (string) config('messages.broadcasting.threads.per-participant-channel');
 
-        return $this->participants
+        // A fresh query, never `$this->participants`: this runs whenever the model event fires,
+        // and loading the relation here would cache whatever the thread held at that moment on
+        // the instance the caller keeps using.
+        return $this->participants()
+            ->get()
             ->map(fn (Participant $participant): PrivateChannel => new PrivateChannel(str_replace(
                 search: ['{name}', '{id}'],
                 replace: [
