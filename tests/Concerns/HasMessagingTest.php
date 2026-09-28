@@ -68,7 +68,7 @@ it('lists unread threads and marks them read', function () {
 });
 
 it('joins an existing thread idempotently', function () {
-    $thread = Messages::start('Open')->create();
+    $thread = Messages::start('Open')->everyoneCanJoin()->create();
 
     $this->alice->joinThread($thread);
     $this->alice->joinThread($thread);

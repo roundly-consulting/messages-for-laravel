@@ -125,12 +125,17 @@ class Thread extends Model
      */
     public function scopeBetween(Builder $query, Model $first, Model $second): Builder
     {
+        // A note-to-self thread holds its one participant once — a participant is never added
+        // twice — so "exactly the two of them" is exactly one row there.
+        $self = $first->getMorphClass() === $second->getMorphClass()
+            && (string) $first->getKey() === (string) $second->getKey();
+
         return $query
             ->where('is_direct', true)
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $first))
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $second))
             // Exactly the two of them — no third participant turns the DM into a group.
-            ->has('participants', '=', 2);
+            ->has('participants', '=', $self ? 1 : 2);
     }
 
     /**

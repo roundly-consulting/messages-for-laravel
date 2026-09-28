@@ -12,6 +12,7 @@ use RoundlyConsulting\Messages\Enums\MessagingOperation;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 
 /**
@@ -163,18 +164,24 @@ final class MessagesFake extends MessagesManager
         $this->assertNone(MessagingOperation::Typing, 'Expected no typing signal, but %d were sent.');
     }
 
+    /**
+     * A participant was added to the thread. Adding someone who was already in it returns their
+     * existing row and does not count.
+     */
     public function assertParticipantAdded(Thread $thread, ?Model $participant = null): void
     {
-        $this->assertRecorded(
-            MessagingOperation::AddParticipant,
-            static fn (MessagingCall $call): bool => self::same($call->thread, $thread) && ($participant === null || self::same($call->participant, $participant)),
+        Assert::assertNotEmpty(
+            array_filter($this->added(), static fn (MessagingCall $call): bool => self::same($call->thread, $thread)
+                && ($participant === null || self::same($call->participant, $participant))),
             'Expected a participant to be added to the thread, but none was.',
         );
     }
 
     public function assertNothingAdded(): void
     {
-        $this->assertNone(MessagingOperation::AddParticipant, 'Expected no participant to be added, but %d were.');
+        $count = count($this->added());
+
+        Assert::assertSame(0, $count, sprintf('Expected no participant to be added, but %d were.', $count));
     }
 
     /**
@@ -290,6 +297,19 @@ final class MessagesFake extends MessagesManager
         }
 
         return $threads;
+    }
+
+    /**
+     * Adds that really added someone — not the ones that found an existing participant.
+     *
+     * @return list<MessagingCall>
+     */
+    private function added(): array
+    {
+        return array_values(array_filter(
+            $this->recorded(MessagingOperation::AddParticipant),
+            static fn (MessagingCall $call): bool => $call->result instanceof Participant && $call->result->wasRecentlyCreated,
+        ));
     }
 
     /**

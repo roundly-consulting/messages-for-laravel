@@ -80,16 +80,13 @@ trait HasMessaging
         return app(MessagesManager::class)->to($thread)->from($this)->send($body);
     }
 
-    /** Ensure this model is a participant of the given thread. */
+    /**
+     * Join the thread yourself. Allowed on a thread open to everyone (`everyone_can_join`); a
+     * no-op returning the existing row when this model is already a participant.
+     */
     public function joinThread(Thread $thread): Participant
     {
-        $existing = $thread->participants()->whereMorphedTo('participant', $this)->first();
-
-        if ($existing instanceof Participant) {
-            return $existing;
-        }
-
-        return app(MessagesManager::class)->thread($thread)->participants()->add($this);
+        return app(MessagesManager::class)->thread($thread)->participants()->add($this, by: $this);
     }
 
     /**

@@ -174,6 +174,7 @@ it('asserts added participants, including a self-join through the trait', functi
     $this->fake->assertNothingAdded();
     failsAssertion(fn () => $this->fake->assertParticipantAdded($this->crew));
 
+    $this->crew->forceFill(['everyone_can_join' => true])->save();
     $carol->joinThread($this->crew);
 
     $this->fake->assertParticipantAdded($this->crew);
