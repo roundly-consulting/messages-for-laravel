@@ -47,7 +47,7 @@ it('finds unread participants with the unread scope', function () {
 it('finds unread messages for a participant', function () {
     $alice = User::create();
     $bob = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($alice)->create();
     Messages::thread($thread)->participants()->add($bob);
     Messages::send($thread, $alice, 'unread one');
 

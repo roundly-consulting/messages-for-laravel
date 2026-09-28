@@ -37,6 +37,8 @@ final class PendingMessage
     /** @var list<UploadedFile> */
     private array $uploads = [];
 
+    private bool $requireParticipation = true;
+
     public function __construct(
         private readonly MessagesManager $manager,
         private readonly Thread $thread,
@@ -45,6 +47,17 @@ final class PendingMessage
     public function from(Model $sender): self
     {
         $this->sender = $sender;
+
+        return $this;
+    }
+
+    /**
+     * Post as a model that is not (or no longer) in the thread — a bot, a support agent. For
+     * trusted server code only: without it, a sender must be a current participant.
+     */
+    public function withoutParticipationCheck(): self
+    {
+        $this->requireParticipation = false;
 
         return $this;
     }
@@ -125,6 +138,7 @@ final class PendingMessage
             parentMessageId: $this->parentMessageId,
             attachments: $this->attachments,
             uploads: $this->uploads,
+            requireParticipation: $this->requireParticipation,
         );
 
         return $this->manager->perform(

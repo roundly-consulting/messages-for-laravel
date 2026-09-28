@@ -13,7 +13,7 @@ it('writes message to thread and bumps last activity', function () {
 
     Carbon::setTestNow($createdAt = now());
 
-    $thread = Messages::start('Important messages only')->create();
+    $thread = Messages::start('Important messages only')->withParticipant($user)->create();
 
     Carbon::setTestNow($sentAt = now()->addMinutes(5));
 
@@ -38,7 +38,7 @@ it('writes message to thread and bumps last activity', function () {
 it('paginates messages from thread', function () {
     $user = User::create();
 
-    $thread = Messages::start('Its Friday then Then Saturday, Sunday')->create();
+    $thread = Messages::start('Its Friday then Then Saturday, Sunday')->withParticipant($user)->create();
 
     $message = Messages::send($thread, $user, 'What!');
 

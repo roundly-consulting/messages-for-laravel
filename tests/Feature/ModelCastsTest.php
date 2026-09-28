@@ -9,8 +9,8 @@ use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('defaults a message type to text and casts the enum', function () {
-    $thread = Messages::start('Chat')->create();
-    $message = Messages::send($thread, User::create(), 'hi');
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
+    $message = Messages::send($thread, $sender, 'hi');
 
     expect($message->refresh()->type)->toBe(MessageType::Text);
 });

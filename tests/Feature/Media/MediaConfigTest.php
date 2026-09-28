@@ -16,9 +16,9 @@ beforeEach(function (): void {
 
 function configuredMessage(): Message
 {
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
-    return Messages::to($thread)->from(User::create())->send('hi');
+    return Messages::to($thread)->from($sender)->send('hi');
 }
 
 it('feeds the configured maximum file size into the bucket validation rules', function (): void {

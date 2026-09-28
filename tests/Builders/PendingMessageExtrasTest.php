@@ -23,7 +23,7 @@ it('builds a system message with replacements through the builder', function () 
 
 it('attaches a sender through the builder', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     $message = Messages::to($thread)->from($user)->send('hi');
 

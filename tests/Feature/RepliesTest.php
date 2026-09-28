@@ -14,7 +14,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('sets the parent on a reply and exposes the relation', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
@@ -36,7 +36,7 @@ it('sets the parent on a reply and exposes the relation', function () {
 
 it('builds a reply through the pending message builder', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     $parent = Messages::send($thread, $user, 'first');
 
@@ -51,7 +51,7 @@ it('builds a reply through the pending message builder', function () {
 
 it('stores a quote snapshot that survives the parent being deleted', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
@@ -76,8 +76,8 @@ it('stores a quote snapshot that survives the parent being deleted', function ()
 
 it('rejects a reply to a message in another thread', function () {
     $user = User::create();
-    $threadA = Messages::start('A')->create();
-    $threadB = Messages::start('B')->create();
+    $threadA = Messages::start('A')->withParticipant($user)->create();
+    $threadB = Messages::start('B')->withParticipant($user)->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $threadA,
@@ -102,7 +102,7 @@ it('rejects a reply to a message in another thread', function () {
  */
 it('rejects a reply to a missing parent message', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,

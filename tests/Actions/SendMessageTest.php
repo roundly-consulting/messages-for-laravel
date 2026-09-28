@@ -16,7 +16,7 @@ it('sends a message, bumps activity and dispatches MessageSent', function () {
 
     $user = User::create();
     Carbon::setTestNow($created = now());
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     Carbon::setTestNow($sent = now()->addMinutes(3));
     $message = app(SendMessage::class)->execute(new SendMessageData(
@@ -55,8 +55,8 @@ it('fires events even when broadcasting is disabled', function () {
     config()->set('messages.broadcasting.enabled', false);
     Event::fake();
 
-    $thread = Messages::start('Chat')->create();
-    app(SendMessage::class)->execute(new SendMessageData($thread, User::create(), 'hi'));
+    $thread = Messages::start('Chat')->withParticipant($user = User::create())->create();
+    app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'hi'));
 
     Event::assertDispatched(MessageSent::class);
 });

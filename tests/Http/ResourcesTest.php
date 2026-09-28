@@ -60,7 +60,7 @@ it('omits unloaded thread relations safely', function () {
 
 it('shapes a message resource including the sender and reply info', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'original'));
     $reply = app(SendMessage::class)->execute(new SendMessageData(
@@ -86,7 +86,7 @@ it('shapes a message resource including the sender and reply info', function () 
 
 it('nulls the body for a deleted message resource', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     $message = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'bye'));
     $message->delete();
 
@@ -100,7 +100,7 @@ it('nulls the body for a deleted message resource', function () {
 
 it('reports an edited timestamp once a text message changes', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     $message = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'first'));
 
     expect(MessageResource::make($message)->toArray(Request::create('/'))['edited_at'])->toBeNull();

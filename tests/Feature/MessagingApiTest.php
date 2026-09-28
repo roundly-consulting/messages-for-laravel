@@ -102,7 +102,7 @@ it('broadcasts a typing signal only when broadcasting is enabled', function () {
 
 it('previews the latest message in a type-aware way', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     expect($thread->latestMessagePreview())->toBeNull();
 
@@ -122,7 +122,7 @@ it('previews the latest message in a type-aware way', function () {
 
 it('previews the latest message when the relation is already loaded', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'loaded'));
 
     $loaded = $thread->load('latestMessage');

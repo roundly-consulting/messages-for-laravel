@@ -87,7 +87,7 @@ it('builds the notification payload and channels from config', function () {
     config()->set('messages.notifications.channels', ['mail', 'database']);
 
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     $message = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
         sender: $user,

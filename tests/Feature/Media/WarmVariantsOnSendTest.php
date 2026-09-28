@@ -71,8 +71,8 @@ it('queues nothing when warming is disabled', function (): void {
 it('queues the warm-variants listener when a message is sent', function (): void {
     Queue::fake();
 
-    $thread = Messages::start('Chat')->create();
-    $message = Messages::to($thread)->from(User::create())
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
+    $message = Messages::to($thread)->from($sender)
         ->attach(UploadedFile::fake()->image('upload.jpg', 400, 300))
         ->send('with an image');
 

@@ -10,7 +10,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 it('prunes messages older than the given days', function () {
     $now = Carbon::now();
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     Carbon::setTestNow($now->copy()->subDays(100));
     Messages::send($thread, $user, 'old');
@@ -31,7 +31,7 @@ it('falls back to the configured retention window', function () {
     config()->set('messages.prune.days', 10);
     $now = Carbon::now();
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     Carbon::setTestNow($now->copy()->subDays(20));
     Messages::send($thread, $user, 'old');
@@ -47,8 +47,8 @@ it('falls back to the configured retention window', function () {
 it('limits pruning to a single thread', function () {
     $now = Carbon::now();
     $user = User::create();
-    $keep = Messages::start('Keep')->create();
-    $prune = Messages::start('Prune')->create();
+    $keep = Messages::start('Keep')->withParticipant($user)->create();
+    $prune = Messages::start('Prune')->withParticipant($user)->create();
 
     Carbon::setTestNow($now->copy()->subDays(100));
     Messages::send($keep, $user, 'keep');

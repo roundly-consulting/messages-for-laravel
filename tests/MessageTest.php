@@ -11,7 +11,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
     $this->user = User::create();
-    $this->thread = Messages::start('Hello Everyone!')->create();
+    $this->thread = Messages::start('Hello Everyone!')->withParticipant($this->user)->create();
     $this->message = Messages::send($this->thread, $this->user, 'Yay!');
 });
 
@@ -24,7 +24,10 @@ it('returns sender from message', function () {
 });
 
 it('throws exception when sender entity does not implement ParticipatesInMessaging interface', function () {
-    $message = Messages::send($this->thread, Restaurant::create(), 'Yay!');
+    $restaurant = Restaurant::create();
+    Messages::thread($this->thread)->participants()->add($restaurant);
+
+    $message = Messages::send($this->thread, $restaurant, 'Yay!');
 
     $message->broadcastWith('created');
 })->expectException(ParticipationException::class);

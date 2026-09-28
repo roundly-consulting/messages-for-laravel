@@ -141,6 +141,16 @@ Messages::prune(days: 30);                    // defaults to messages.prune.days
 roles (see [Participant roles & permissions](#participant-roles--permissions)). Leave it out for
 trusted server-side calls — no check runs.
 
+**A sender must be in the thread.** Every send — `to()->from()->send()`, `send()`,
+`sendMessageTo()`, the `SendMessage` action — refuses a sender who is not a current participant
+(never joined, left, or removed) with an `UnauthorizedMessagingAction`; `typing()` refuses them
+with a `ParticipationException`. A system message has no sender and is always allowed. Trusted
+server code posting as an outsider (a bot, a support agent) opts out explicitly:
+
+```php
+Messages::to($thread)->from($supportBot)->withoutParticipationCheck()->send('We are on it.');
+```
+
 **Scoped handles refuse other threads.** `Messages::thread($thread)->message($message)` throws a
 `MessageException` when the message belongs to another thread, and every participants method
 accepts either the participating model or its `Participant` row — a row from another thread
@@ -155,7 +165,7 @@ Messages::thread($thread)->message($message)->edit($request->body, by: $request-
 | Method | Returns | Action |
 |---|---|---|
 | `start(?string $name)` → `PendingThread::create()` | `Thread` | `StartThread` |
-| `to(Thread)` → `PendingMessage::send(?string $body)` | `Message` | `SendMessage` |
+| `to(Thread)` → `PendingMessage::send(?string $body)` | `Message` (sender must participate) | `SendMessage` |
 | `direct(Model, Model)` | `Thread` | `FindOrCreateDirectThread` |
 | `send(Thread, ?Model $sender, string $body)` | `Message` | `SendMessage` |
 | `markRead(Thread, Model)` | `Participant` | `MarkRead` |
@@ -320,10 +330,11 @@ $participants->transferOwnership(from: $alice, to: $bob); // $alice is demoted t
 Role enforcement is opt-out via `messages.permissions.enabled` (default `true`) and is **skipped
 for direct threads**, which are always roleless: there, and with roles off, every participant is
 a peer who may manage the thread. **An actor must always be a participant**, though — whatever the
-config and thread type, someone who is not in the thread (or has left it) cannot rename, archive,
-manage participants, or edit or delete messages in it, including their own. When an actor is
-refused the action throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`.
-Passing no `by:` actor skips the check, so trusted server-side code keeps working unchanged.
+config and thread type, someone who is not in the thread (or has left it) cannot send, rename,
+archive, manage participants, or edit or delete messages in it, including their own. When an actor
+is refused the action throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`.
+Passing no `by:` actor skips the role check, so trusted server-side code keeps working unchanged;
+a sender is always checked unless you call `withoutParticipationCheck()`.
 
 Renaming and archiving:
 

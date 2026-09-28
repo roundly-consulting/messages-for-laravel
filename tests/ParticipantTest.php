@@ -66,7 +66,9 @@ it('returns event name for broadcasting', function () {
 
 it('marks itself read through the manager, firing ThreadRead', function () {
     Event::fake([ThreadRead::class]);
-    Messages::send($this->thread, User::create(), 'hi');
+    $sender = User::create();
+    Messages::thread($this->thread)->participants()->add($sender);
+    Messages::send($this->thread, $sender, 'hi');
 
     $returned = $this->participant->markAsRead();
 

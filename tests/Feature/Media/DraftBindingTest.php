@@ -26,9 +26,9 @@ function draftToken(string $name = 'draft.jpg'): string
 
 it('binds a draft media token to the sent message', function (): void {
     $token = draftToken();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
-    $message = Messages::to($thread)->from(User::create())
+    $message = Messages::to($thread)->from($sender)
         ->withAttachment($token)
         ->send('with a draft');
 
@@ -40,9 +40,9 @@ it('binds a draft media token to the sent message', function (): void {
 });
 
 it('binds several draft tokens at once', function (): void {
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
-    $message = Messages::to($thread)->from(User::create())
+    $message = Messages::to($thread)->from($sender)
         ->withAttachments([draftToken('one.jpg'), draftToken('two.jpg')])
         ->send('two drafts');
 
@@ -50,9 +50,9 @@ it('binds several draft tokens at once', function (): void {
 });
 
 it('attaches an uploaded file on send', function (): void {
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
-    $message = Messages::to($thread)->from(User::create())
+    $message = Messages::to($thread)->from($sender)
         ->attach(UploadedFile::fake()->image('upload.jpg', 400, 300))
         ->send('with an upload');
 
@@ -62,23 +62,23 @@ it('attaches an uploaded file on send', function (): void {
 
 it('exposes attachments to MessageSent listeners', function (): void {
     $token = draftToken();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
     $seen = null;
     Event::listen(MessageSent::class, function (MessageSent $event) use (&$seen): void {
         $seen = $event->message->attachments()->count();
     });
 
-    Messages::to($thread)->from(User::create())->withAttachment($token)->send('hi');
+    Messages::to($thread)->from($sender)->withAttachment($token)->send('hi');
 
     expect($seen)->toBe(1);
 });
 
 it('rolls the send back when a draft token is unknown', function (): void {
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
     try {
-        Messages::to($thread)->from(User::create())
+        Messages::to($thread)->from($sender)
             ->withAttachment('does-not-exist')
             ->send('doomed');
 
@@ -90,9 +90,9 @@ it('rolls the send back when a draft token is unknown', function (): void {
 });
 
 it('sends a plain message unchanged when no attachments are given', function (): void {
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
 
-    $message = Messages::to($thread)->from(User::create())->send('plain');
+    $message = Messages::to($thread)->from($sender)->send('plain');
 
     expect($message->message)->toBe('plain')
         ->and($message->hasAttachments())->toBeFalse()

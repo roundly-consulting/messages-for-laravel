@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
+use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessageModel;
 
@@ -17,6 +18,8 @@ final class SendMessage
 {
     public function execute(SendMessageData $data): Message
     {
+        $this->authorize($data);
+
         $meta = $data->meta;
 
         if ($data->parentMessageId !== null) {
@@ -56,6 +59,29 @@ final class SendMessage
         Event::dispatch(new MessageSent($message));
 
         return $message;
+    }
+
+    /**
+     * Only a current participant may post — the same rule every other write applies to its
+     * actor. A left or removed participant's row is soft-deleted, so the relation's own scope
+     * refuses them too. A system message has no sender and is always allowed.
+     *
+     * @throws UnauthorizedMessagingAction
+     */
+    private function authorize(SendMessageData $data): void
+    {
+        if ($data->sender === null || ! $data->requireParticipation) {
+            return;
+        }
+
+        $participates = $data->thread
+            ->participants()
+            ->whereMorphedTo('participant', $data->sender)
+            ->exists();
+
+        if (! $participates) {
+            throw UnauthorizedMessagingAction::for($data->sender, 'send messages to this thread');
+        }
     }
 
     /**

@@ -17,7 +17,7 @@ beforeEach(function () {
 
 it('asserts a thread has any message and a specific body', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'specific body'));
 
     expect($thread)
@@ -52,7 +52,7 @@ it('fails when a thread has no matching message', function () {
 
 it('fails when a thread has no matching body', function () {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'present'));
 
     expect(fn () => expect($thread)->toHaveSentMessage('absent'))

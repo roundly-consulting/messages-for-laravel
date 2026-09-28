@@ -21,8 +21,8 @@ beforeEach(function (): void {
 
 function messageWithAttachment(string $name = 'a.jpg'): array
 {
-    $thread = Messages::start('Chat')->create();
-    $message = Messages::to($thread)->from(User::create())->send('hi');
+    $thread = Messages::start('Chat')->withParticipant($sender = User::create())->create();
+    $message = Messages::to($thread)->from($sender)->send('hi');
     $media = $message->addMedia(UploadedFile::fake()->image($name, 400, 300))->toMediaBucket('attachments');
 
     return [$message, $media];

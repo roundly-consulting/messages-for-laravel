@@ -17,7 +17,7 @@ beforeEach(function (): void {
 function attachmentMessage(): Message
 {
     $user = User::create();
-    $thread = Messages::start('Chat')->create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
 
     return Messages::to($thread)->from($user)->send('hi');
 }

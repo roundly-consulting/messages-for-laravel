@@ -24,7 +24,7 @@ it('does nothing while broadcasting is off', function () {
     config()->set('messages.broadcasting.enabled', false);
     $user = User::create();
 
-    app(SignalTyping::class)->execute(Messages::start('Chat')->create(), $user);
+    app(SignalTyping::class)->execute(Messages::start('Chat')->withParticipant($user)->create(), $user);
 
     Event::assertNotDispatched(ParticipantTyping::class);
 });

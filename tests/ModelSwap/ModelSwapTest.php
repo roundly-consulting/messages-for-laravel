@@ -44,7 +44,7 @@ it('honours a host thread model through the real start-thread flow', function ()
 it('honours a host message model through the real send flow', function (): void {
     expect('messages.models.message')->toHonourModelSwap(CustomMessage::class, function (): array {
         $sender = User::create();
-        $thread = Messages::start('Swapped send')->create();
+        $thread = Messages::start('Swapped send')->withParticipant($sender)->create();
 
         $message = Messages::send($thread, $sender, 'sent through the swapped model');
 
