@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Messages\Events\MessageDeleted;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
+use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
@@ -20,9 +21,17 @@ final class DeleteMessage
             throw MessageException::alreadyDeleted($message);
         }
 
-        // Deleting someone else's message requires manage rights on a group thread.
-        if ($actor !== null && $message->thread instanceof Thread) {
-            MessagingPermissions::authorizeDeleteMessage($message->thread, $actor, $message);
+        // The actor must be in the thread; deleting someone else's message also needs manage
+        // rights on a group thread. A message whose thread is gone cannot be checked, so it is
+        // refused rather than waved through.
+        if ($actor !== null) {
+            $thread = $message->thread;
+
+            if (! $thread instanceof Thread) {
+                throw UnauthorizedMessagingAction::for($actor, 'delete this message');
+            }
+
+            MessagingPermissions::authorizeDeleteMessage($thread, $actor, $message);
         }
 
         $message->delete();

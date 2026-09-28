@@ -15,8 +15,8 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
-    $this->thread = Messages::start('Chat')->create();
     $this->author = User::create();
+    $this->thread = Messages::start('Chat')->withParticipant($this->author)->create();
     $this->message = Messages::send($this->thread, $this->author, 'first');
 });
 

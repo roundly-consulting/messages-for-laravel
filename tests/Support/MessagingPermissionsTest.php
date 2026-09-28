@@ -27,15 +27,20 @@ it('is enabled by config', function () {
     expect(MessagingPermissions::enabled())->toBeFalse();
 });
 
-it('does not enforce on direct threads', function () {
+it('does not enforce roles on direct threads, but still requires a participant', function () {
     $a = User::create();
     $b = User::create();
-    $thread = Messages::start('x')->create();
+    $stranger = User::create();
+    $thread = Messages::start('x')->withParticipants([$a, $b])->create();
     $thread->forceFill(['is_direct' => true])->save();
 
     expect(MessagingPermissions::enforces($thread))->toBeFalse()
         ->and(MessagingPermissions::canManage($thread, $a))->toBeTrue()
-        ->and(MessagingPermissions::canTransferOwnership($thread, $b))->toBeTrue();
+        ->and(MessagingPermissions::canTransferOwnership($thread, $b))->toBeTrue()
+        ->and(MessagingPermissions::canSetRoles($thread, $b))->toBeTrue()
+        ->and(MessagingPermissions::canManage($thread, $stranger))->toBeFalse()
+        ->and(MessagingPermissions::canTransferOwnership($thread, $stranger))->toBeFalse()
+        ->and(MessagingPermissions::canSetRoles($thread, $stranger))->toBeFalse();
 });
 
 it('does not enforce when disabled', function () {

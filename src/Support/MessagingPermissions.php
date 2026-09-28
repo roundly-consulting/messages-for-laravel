@@ -11,8 +11,12 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 
 /**
- * Centralises role-based authorization for group threads. Enforcement is config-gated
- * and skipped entirely for direct (1:1) threads, which are intentionally roleless.
+ * Centralises authorization for actor-checked operations.
+ *
+ * Two layers: an actor must first be a **participant** of the thread — always, whatever the
+ * config and thread type; roles never make an outsider an insider. Then, on a group thread with
+ * `messages.permissions.enabled`, their **role** decides. Direct (1:1) threads are roleless, so
+ * there — and with roles off — every participant is a peer.
  */
 final class MessagingPermissions
 {
@@ -30,11 +34,13 @@ final class MessagingPermissions
     /** A manager may add/remove participants, rename, archive, and moderate others' messages. */
     public static function canManage(Thread $thread, Model $actor): bool
     {
-        if (! self::enforces($thread)) {
-            return true;
+        $participation = $thread->participationOf($actor);
+
+        if ($participation === null) {
+            return false;
         }
 
-        return $thread->roleOf($actor)?->canManage() === true;
+        return ! self::enforces($thread) || $participation->role?->canManage() === true;
     }
 
     /**
@@ -43,27 +49,19 @@ final class MessagingPermissions
      */
     public static function canSetRoles(Thread $thread, Model $actor): bool
     {
-        if (! self::enforces($thread)) {
-            return true;
-        }
-
-        return $thread->roleOf($actor)?->isOwner() === true;
+        return self::isOwnerOrPeer($thread, $actor);
     }
 
     public static function canTransferOwnership(Thread $thread, Model $actor): bool
     {
-        if (! self::enforces($thread)) {
-            return true;
-        }
-
-        return $thread->roleOf($actor)?->isOwner() === true;
+        return self::isOwnerOrPeer($thread, $actor);
     }
 
-    /** Anyone may delete their own message; managers may delete anyone's. */
+    /** A participant may delete their own message; managers may delete anyone's. */
     public static function canDeleteMessage(Thread $thread, Model $actor, Message $message): bool
     {
         if (self::isAuthor($message, $actor)) {
-            return true;
+            return $thread->participationOf($actor) !== null;
         }
 
         return self::canManage($thread, $actor);
@@ -76,7 +74,11 @@ final class MessagingPermissions
      */
     public static function canEditMessage(Message $message, Model $actor): bool
     {
-        return self::isAuthor($message, $actor);
+        $thread = $message->thread;
+
+        return self::isAuthor($message, $actor)
+            && $thread instanceof Thread
+            && $thread->participationOf($actor) !== null;
     }
 
     public static function authorizeManage(Thread $thread, Model $actor, string $action): void
@@ -112,6 +114,20 @@ final class MessagingPermissions
         if (! self::canEditMessage($message, $actor)) {
             throw UnauthorizedMessagingAction::for($actor, 'edit this message');
         }
+    }
+
+    /**
+     * The owner on an enforced group thread; any participant where roles do not apply.
+     */
+    private static function isOwnerOrPeer(Thread $thread, Model $actor): bool
+    {
+        $participation = $thread->participationOf($actor);
+
+        if ($participation === null) {
+            return false;
+        }
+
+        return ! self::enforces($thread) || $participation->role?->isOwner() === true;
     }
 
     private static function isAuthor(Message $message, Model $actor): bool

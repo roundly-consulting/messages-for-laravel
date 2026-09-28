@@ -19,7 +19,11 @@ Initial public release.
   `leave()`, `setRole()`, `transferOwnership()`); and a `message($m)` handle (`edit()`,
   `delete()`). Scoped handles refuse a message or participant row of another thread.
 - Owner, admin and member roles in group threads, with ownership transfer, renaming and archiving.
-  Only a message's author may edit it; owners and admins may delete others' messages.
+  Only the owner changes roles, and ownership moves only through `transferOwnership()`. Only a
+  message's author may edit it; owners and admins may delete others' messages. Every actor-checked
+  operation requires the actor to be a participant, with roles on or off.
+- Find-or-add participants: adding someone already in a thread returns their existing row, and a
+  self-join (`joinThread()`) is allowed only on threads open to everyone.
 - Read receipts and unread counts per thread or overall.
 - Replies that keep a snapshot of the quoted message, plus editing, unsending and translatable
   system messages.

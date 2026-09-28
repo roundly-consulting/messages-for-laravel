@@ -137,8 +137,9 @@ Messages::message($message)->delete(by: $alice);               // author, or a m
 Messages::prune(days: 30);                    // defaults to messages.prune.days
 ```
 
-`by:` is the acting participant; it is checked against the thread's roles (see below). Leave it
-out for trusted server-side calls — no check runs.
+`by:` is the acting participant; it must be in the thread and is checked against the thread's
+roles (see [Participant roles & permissions](#participant-roles--permissions)). Leave it out for
+trusted server-side calls — no check runs.
 
 **Scoped handles refuse other threads.** `Messages::thread($thread)->message($message)` throws a
 `MessageException` when the message belongs to another thread, and every participants method
@@ -167,7 +168,7 @@ Messages::thread($thread)->message($message)->edit($request->body, by: $request-
 | `thread()->typing(Model)` | `void` | `SignalTyping` |
 | `thread()->messages(perPage, page, pageName)` | `LengthAwarePaginator<Message>` | — |
 | `thread()->message(Message)` | `MessageHandle` | — (refuses other threads) |
-| `thread()->participants()->add(Model, ?ParticipantRole, by:)` | `Participant` | `AddParticipant` |
+| `thread()->participants()->add(Model, ?ParticipantRole, by:)` | `Participant` (existing row if already in) | `AddParticipant` |
 | `thread()->participants()->remove(Model, by:)` / `leave(Model)` | `void` | `RemoveParticipant` / `LeaveThread` |
 | `thread()->participants()->setRole(Model, ParticipantRole, by:)` | `Participant` | `SetParticipantRole` |
 | `thread()->participants()->transferOwnership(from:, to:)` | `Participant` | `TransferOwnership` |
@@ -233,7 +234,7 @@ counterpart):
 | `assertThreadArchived(thread)` / `assertNothingArchived()` | `thread()->archive()` |
 | `assertMarkedRead(thread, ?by)` / `assertNothingMarkedRead()` | `markRead()`, `markThreadRead()`, `markReadFor()`, `markAsRead()` |
 | `assertTyping(thread, ?participant)` / `assertNothingTyping()` | `thread()->typing()`, `$thread->typing()` |
-| `assertParticipantAdded(thread, ?participant)` / `assertNothingAdded()` | `participants()->add()`, `joinThread()` |
+| `assertParticipantAdded(thread, ?participant)` / `assertNothingAdded()` | `participants()->add()`, `joinThread()` — new rows only, not a re-add |
 | `assertParticipantRemoved(thread, ?participant)` / `assertNothingRemoved()` | `participants()->remove()` / `leave()` |
 | `assertRoleChanged(thread, ?participant, ?role)` / `assertNothingRoleChanged()` | `participants()->setRole()` |
 | `assertOwnershipTransferred(thread, ?to)` / `assertNothingTransferred()` | `participants()->transferOwnership()` |
@@ -270,8 +271,18 @@ $alice->sendMessageTo($thread, 'Welcome everyone');
 $alice->threads();        // every thread $alice is in, newest activity first
 $alice->conversations();  // alias of threads() with a chat-inbox name
 $alice->unreadThreads();  // only threads with unread messages
-$alice->joinThread($thread);
+$dave->joinThread($thread);  // only when the thread is open to everyone
 ```
+
+`joinThread()` is a self-join: it is allowed only on a thread created with `->everyoneCanJoin()`
+(or `messages.publicity.everyone-can-join`) and throws an `UnauthorizedMessagingAction`
+otherwise — direct threads are never open. For someone who is already in the thread it is a
+no-op returning their row. To bring someone into a closed thread, a manager adds them:
+`Messages::thread($thread)->participants()->add($dave, by: $alice)`.
+
+Adding someone who is already a participant never creates a second row: `add()` returns their
+existing `Participant` unchanged (no event, no system message, no role change — use `setRole()`
+for that). Someone who left and is added again gets a fresh row.
 
 ## Participant roles & permissions
 
@@ -279,7 +290,12 @@ Group threads carry per-participant roles — **owner**, **admin**, **member**
 (`RoundlyConsulting\Messages\Enums\ParticipantRole`). The participant who starts a thread is
 its owner; everyone added afterwards joins as a member. Owners and admins may add/remove
 participants, rename and archive the thread, and moderate anyone's messages; members may only
-manage their own messages.
+manage their own messages. Changing roles is the **owner's** alone — an admin can add members
+but can neither promote anyone to admin nor demote a fellow admin.
+
+**Ownership only moves through `transferOwnership()`.** `setRole()` never grants the owner role
+and never changes the owner's role, and `add()` never creates a second owner — for any caller,
+trusted ones included. Both throw a `ParticipationException`.
 
 ```php
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
@@ -294,10 +310,13 @@ $participants->setRole($bob, ParticipantRole::Admin, by: $alice);
 $participants->transferOwnership(from: $alice, to: $bob); // $alice is demoted to admin
 ```
 
-Enforcement is opt-out via `messages.permissions.enabled` (default `true`) and is **skipped for
-direct threads**, which are always roleless. When an actor lacks the required role the action
-throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`. Passing no
-`by:` actor skips the check, so trusted server-side code keeps working unchanged.
+Role enforcement is opt-out via `messages.permissions.enabled` (default `true`) and is **skipped
+for direct threads**, which are always roleless: there, and with roles off, every participant is
+a peer who may manage the thread. **An actor must always be a participant**, though — whatever the
+config and thread type, someone who is not in the thread (or has left it) cannot rename, archive,
+manage participants, or edit or delete messages in it, including their own. When an actor is
+refused the action throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`.
+Passing no `by:` actor skips the check, so trusted server-side code keeps working unchanged.
 
 Renaming and archiving:
 

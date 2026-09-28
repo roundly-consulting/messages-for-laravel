@@ -274,9 +274,21 @@ class Thread extends Model
     /** The role the given model holds in this thread, or null if not a participant. */
     public function roleOf(Model $participant): ?ParticipantRole
     {
-        $row = $this->participantRecordFor($participant);
+        return $this->participationOf($participant)?->role;
+    }
 
-        return $row?->role;
+    /** The model's (active) participant row in this thread, or null if it is not in it. */
+    public function participationOf(Model $participant): ?Participant
+    {
+        if ($this->relationLoaded('participants')) {
+            return $this->participants
+                ->first(fn (Participant $p): bool => (string) $p->participant_id === (string) $participant->getKey()
+                    && $p->participant_type === $participant->getMorphClass());
+        }
+
+        return $this->participants()
+            ->whereMorphedTo('participant', $participant)
+            ->first();
     }
 
     /** Whether the given participant may manage this thread (owner/admin on a group thread). */
@@ -328,19 +340,6 @@ class Thread extends Model
         }
 
         return $latest->preview();
-    }
-
-    private function participantRecordFor(Model $participant): ?Participant
-    {
-        if ($this->relationLoaded('participants')) {
-            return $this->participants
-                ->first(fn (Participant $p): bool => $p->participant_id == $participant->getKey()
-                    && $p->participant_type === $participant->getMorphClass());
-        }
-
-        return $this->participants()
-            ->whereMorphedTo('participant', $participant)
-            ->first();
     }
 
     /**
