@@ -24,7 +24,7 @@ beforeEach(function (): void {
 
 function privateAttachment(UploadedFile $file): array
 {
-    $message = Messages::to(messaging()->threads()->create(name: 'Chat'))->from(User::create())->send('hi');
+    $message = Messages::to(Messages::start('Chat')->create())->from(User::create())->send('hi');
 
     return [$message, $message->addMedia($file)->toMediaBucket('attachments')];
 }

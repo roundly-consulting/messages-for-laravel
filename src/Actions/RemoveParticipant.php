@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Actions;
 
 use Illuminate\Support\Facades\Event;
-use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
+use RoundlyConsulting\Messages\DataTransferObjects\RemoveParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Events\ParticipantLeft;
@@ -20,7 +20,7 @@ final class RemoveParticipant
         private readonly SendMessage $sendMessage,
     ) {}
 
-    public function execute(AddParticipantData $data): void
+    public function execute(RemoveParticipantData $data): void
     {
         // Removing someone else requires manage rights; leaving (self) is always allowed.
         if ($data->actor !== null && ! $this->isSelf($data)) {
@@ -45,14 +45,14 @@ final class RemoveParticipant
         $this->maybeSystemMessage($data);
     }
 
-    private function isSelf(AddParticipantData $data): bool
+    private function isSelf(RemoveParticipantData $data): bool
     {
         return $data->actor !== null
             && $data->actor->getKey() === $data->participant->getKey()
             && $data->actor->getMorphClass() === $data->participant->getMorphClass();
     }
 
-    private function maybeSystemMessage(AddParticipantData $data): void
+    private function maybeSystemMessage(RemoveParticipantData $data): void
     {
         if (config('messages.system-messages.enabled') !== true) {
             return;

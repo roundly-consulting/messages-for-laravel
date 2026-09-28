@@ -12,7 +12,7 @@ it('builds a private thread with a single participant', function () {
     $alice = User::create();
 
     /** @var PendingThread $pending */
-    $pending = Messages::thread();
+    $pending = Messages::start();
     $thread = $pending
         ->named('Secret')
         ->private()
@@ -25,13 +25,13 @@ it('builds a private thread with a single participant', function () {
 });
 
 it('builds a direct thread through the builder', function () {
-    $thread = Messages::thread()->direct()->create();
+    $thread = Messages::start()->direct()->create();
 
     expect($thread->is_direct)->toBeTrue();
 });
 
 it('sends a typed message through the builder', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     /** @var PendingMessage $pending */
     $pending = Messages::to($thread);

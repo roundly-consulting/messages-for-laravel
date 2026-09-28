@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Tests\Fixtures;
 
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -160,7 +161,7 @@ final class LatestMessageVectors
     public static function assertScenario(Thread $thread, ?string $expected): void
     {
         $user = User::create();
-        messaging()->participants()->addParticipantToThread($thread, $user);
+        Messages::thread($thread)->participants()->add($user);
 
         // 1. Lazy relation read.
         $reloaded = $thread->fresh();

@@ -23,7 +23,7 @@ ArchPresets::strictTypes('RoundlyConsulting\Messages');
  *  - NewMessageNotification — `messages.notifications.notification` documents overriding it
  *    to change channels, content or queueing. It is *not* a model (it extends
  *    Notification), so it is exempt here but deliberately absent from the swap map below.
- *  - MessagesManager — the package's own FakeMessagesManager extends it, which is how
+ *  - MessagesManager — the package's own MessagesFake extends it, which is how
  *    `Messages::fake()` works. `final` would break a feature this package ships.
  */
 ArchPresets::finalByDefault('RoundlyConsulting\Messages', [
@@ -88,3 +88,10 @@ ArchPresets::morphColumnsUseTheSeam(__DIR__.'/../database/migrations');
 ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../composer.json');
 
 ArchPresets::noDebuggingLeftovers();
+
+/**
+ * One path into the behaviour: `HasMessaging`, `Thread::markReadFor()/typing()` and
+ * `Participant::markAsRead()` go through the MessagesManager, never an action, so
+ * `Messages::fake()` sees every call a model makes.
+ */
+ArchPresets::modelsGoThroughTheFacade('RoundlyConsulting\Messages');

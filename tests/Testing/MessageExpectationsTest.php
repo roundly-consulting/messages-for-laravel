@@ -8,6 +8,7 @@ use RoundlyConsulting\Messages\Actions\StartThread;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
@@ -16,7 +17,7 @@ beforeEach(function () {
 
 it('asserts a thread has any message and a specific body', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'specific body'));
 
     expect($thread)
@@ -43,7 +44,7 @@ it('asserts unread, participant and role expectations', function () {
 });
 
 it('fails when a thread has no matching message', function () {
-    $thread = messaging()->threads()->create(name: 'Empty');
+    $thread = Messages::start('Empty')->create();
 
     expect(fn () => expect($thread)->toHaveSentMessage())
         ->toThrow(AssertionFailedError::class);
@@ -51,7 +52,7 @@ it('fails when a thread has no matching message', function () {
 
 it('fails when a thread has no matching body', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'present'));
 
     expect(fn () => expect($thread)->toHaveSentMessage('absent'))

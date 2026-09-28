@@ -7,8 +7,15 @@ namespace RoundlyConsulting\Messages\Builders;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Actions\StartThread;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\DataTransferObjects\MessagingCall;
+use RoundlyConsulting\Messages\Enums\MessagingOperation;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Thread;
 
+/**
+ * A conversation being set up — `Messages::start($name)`. The first participant becomes the
+ * owner of a group thread.
+ */
 final class PendingThread
 {
     private ?bool $isPublic = null;
@@ -21,7 +28,7 @@ final class PendingThread
     private array $participants = [];
 
     public function __construct(
-        private readonly StartThread $startThread,
+        private readonly MessagesManager $manager,
         private ?string $name = null,
     ) {}
 
@@ -79,12 +86,18 @@ final class PendingThread
 
     public function create(): Thread
     {
-        return $this->startThread->execute(new CreateThreadData(
+        $data = new CreateThreadData(
             name: $this->name,
             isPublic: $this->isPublic,
             everyoneCanJoin: $this->everyoneCanJoin,
             isDirect: $this->isDirect,
             participants: $this->participants,
-        ));
+        );
+
+        return $this->manager->perform(
+            new MessagingCall(MessagingOperation::Start, text: $this->name),
+            StartThread::class,
+            static fn (StartThread $action): Thread => $action->execute($data),
+        );
     }
 }

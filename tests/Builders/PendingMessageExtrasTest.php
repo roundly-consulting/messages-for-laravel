@@ -7,7 +7,7 @@ use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('builds a system message with replacements through the builder', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)
         ->asSystem('messages::messages.system.thread_renamed', ['name' => 'New'])
@@ -23,7 +23,7 @@ it('builds a system message with replacements through the builder', function () 
 
 it('attaches a sender through the builder', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)->from($user)->send('hi');
 

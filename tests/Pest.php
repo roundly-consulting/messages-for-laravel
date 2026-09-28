@@ -31,21 +31,16 @@ uses(TestCase::class)->in(
     __DIR__.'/Events',
     __DIR__.'/Facades',
     __DIR__.'/Feature',
-    __DIR__.'/HelpersTest.php',
     __DIR__.'/Http',
     // The bigint leg rides the default base case precisely because it must prove the
     // *unconfigured* install is correct.
     __DIR__.'/KeyTypes/BigIntKeyTest.php',
-    __DIR__.'/MessagesRepositoryTest.php',
     __DIR__.'/MessageTest.php',
-    __DIR__.'/MessagingServiceTest.php',
     __DIR__.'/Models',
     __DIR__.'/Notifications',
-    __DIR__.'/ParticipantsRepositoryTest.php',
     __DIR__.'/ParticipantTest.php',
     __DIR__.'/Support',
     __DIR__.'/Testing',
-    __DIR__.'/ThreadsRepositoryTest.php',
     __DIR__.'/ThreadTest.php',
 );
 

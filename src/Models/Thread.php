@@ -17,12 +17,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection as SupportCollection;
-use RoundlyConsulting\Messages\Actions\MarkRead;
 use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
-use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
-use RoundlyConsulting\Messages\Events\ParticipantTyping;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
@@ -97,8 +95,26 @@ class Thread extends Model
         return $query
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $participant))
             ->latest('last_activity_at')
-            // Deterministic tiebreak — see ThreadsRepository::paginate().
+            // Deterministic tiebreak — see MessagesManager::threads().
             ->orderByDesc('id');
+    }
+
+    /**
+     * Threads the given model may see: public threads plus the ones it takes part in. With
+     * no model, public threads only.
+     *
+     * @param  Builder<Thread>  $query
+     * @return Builder<Thread>
+     */
+    public function scopeVisibleTo(Builder $query, ?Model $participant): Builder
+    {
+        return $query->where(function (Builder $visible) use ($participant): void {
+            $visible->where('is_public', true);
+
+            if ($participant !== null) {
+                $visible->orWhereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $participant));
+            }
+        });
     }
 
     /**
@@ -134,7 +150,7 @@ class Thread extends Model
                 'messages as unread_count' => fn (Builder $q): Builder => self::applyUnreadFor($q, $participant),
             ])
             ->latest('last_activity_at')
-            // Deterministic tiebreak — see ThreadsRepository::paginate().
+            // Deterministic tiebreak — see MessagesManager::threads().
             ->orderByDesc('id')
             ->withCasts(['unread_count' => 'integer']);
     }
@@ -264,11 +280,10 @@ class Thread extends Model
         return MessagingPermissions::canManage($this, $participant);
     }
 
+    /** Move the participant's read pointer to this thread's newest message. */
     public function markReadFor(Model $participant): Participant
     {
-        return app(MarkRead::class)->execute(
-            new MarkReadData($this, $participant),
-        );
+        return app(MessagesManager::class)->markRead($this, $participant);
     }
 
     /**
@@ -293,11 +308,7 @@ class Thread extends Model
     /** Broadcast a transient "is typing" signal. Never persisted; respects broadcasting.enabled. */
     public function typing(Model $participant): void
     {
-        if (config('messages.broadcasting.enabled') !== true) {
-            return;
-        }
-
-        ParticipantTyping::dispatch($this, $participant);
+        app(MessagesManager::class)->thread($this)->typing($participant);
     }
 
     /** A short, type-aware preview of the most recent message. */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -19,7 +20,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
  * SQLite happened to return tied rows in physical insertion order, which is why the suite
  * agreed with itself for the package's whole life. Postgres does not promise that and does
  * not always do it — this surfaced as a 1-in-~24 red on the pgsql leg
- * (`ThreadsRepositoryTest > it paginates threads`), reproducible only by re-running.
+ * (`ThreadListingTest > it paginates threads`), reproducible only by re-running.
  *
  * The tiebreak is `id` desc, which is deterministic *and* meaningful rather than arbitrary:
  * {@see HasUuids} mints `Str::uuid7()`, so within one `last_activity_at` the greater id is
@@ -47,7 +48,7 @@ it('paginates tied threads in a stable, newest-first order', function () use ($t
     // Repeated identically: an unstable sort is free to answer differently each time, so one
     // agreeing run proves nothing.
     foreach (range(1, 4) as $ignored) {
-        expect(messaging()->threads()->paginate()->getCollection()->pluck('name')->all())
+        expect(Messages::threads()->getCollection()->pluck('name')->all())
             ->toBe($expected);
     }
 });
@@ -57,7 +58,7 @@ it('orders a participant inbox deterministically when activity ties', function (
     $user = User::create();
 
     foreach ($threads as $thread) {
-        messaging()->participants()->addParticipantToThread(thread: $thread, participant: $user);
+        Messages::thread($thread)->participants()->add($user);
     }
 
     $expected = collect($threads)->sortByDesc->getKey()->pluck('name')->values()->all();

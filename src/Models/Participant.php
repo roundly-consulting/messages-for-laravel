@@ -18,6 +18,7 @@ use RoundlyConsulting\Messages\Database\Factories\ParticipantFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
@@ -75,14 +76,19 @@ class Participant extends Model
         return $query->whereNull('read_at');
     }
 
+    /**
+     * Move this participant's read pointer to the thread's newest message — the same
+     * operation as `Messages::markRead()`, so it fires `ThreadRead` and the fake sees it.
+     *
+     * @throws ParticipationException when the participating model no longer exists
+     */
     public function markAsRead(): static
     {
-        $latest = $this->thread->latestMessage()->first();
+        $participant = $this->participant ?? throw ParticipationException::participantMissing($this);
 
-        $this->forceFill([
-            'read_at' => now(),
-            'last_read_message_id' => $latest?->getKey(),
-        ])->save();
+        $updated = app(MessagesManager::class)->markRead($this->thread, $participant);
+
+        $this->setRawAttributes($updated->getAttributes(), sync: true);
 
         return $this;
     }

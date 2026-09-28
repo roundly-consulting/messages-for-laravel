@@ -3,19 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('prunes messages older than the given days', function () {
     $now = Carbon::now();
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     Carbon::setTestNow($now->copy()->subDays(100));
-    messaging()->messages()->sendMessage($thread, $user, 'old');
+    Messages::send($thread, $user, 'old');
 
     Carbon::setTestNow($now);
-    messaging()->messages()->sendMessage($thread, $user, 'fresh');
+    Messages::send($thread, $user, 'fresh');
 
     $this->artisan('messages:prune', ['--days' => 30])
         ->expectsOutputToContain('Pruned 1 message(s)')
@@ -30,10 +31,10 @@ it('falls back to the configured retention window', function () {
     config()->set('messages.prune.days', 10);
     $now = Carbon::now();
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     Carbon::setTestNow($now->copy()->subDays(20));
-    messaging()->messages()->sendMessage($thread, $user, 'old');
+    Messages::send($thread, $user, 'old');
     Carbon::setTestNow($now);
 
     $this->artisan('messages:prune')->assertSuccessful();
@@ -46,12 +47,12 @@ it('falls back to the configured retention window', function () {
 it('limits pruning to a single thread', function () {
     $now = Carbon::now();
     $user = User::create();
-    $keep = messaging()->threads()->create(name: 'Keep');
-    $prune = messaging()->threads()->create(name: 'Prune');
+    $keep = Messages::start('Keep')->create();
+    $prune = Messages::start('Prune')->create();
 
     Carbon::setTestNow($now->copy()->subDays(100));
-    messaging()->messages()->sendMessage($keep, $user, 'keep');
-    messaging()->messages()->sendMessage($prune, $user, 'prune');
+    Messages::send($keep, $user, 'keep');
+    Messages::send($prune, $user, 'prune');
     Carbon::setTestNow($now);
 
     $this->artisan('messages:prune', ['--days' => 30, '--thread' => $prune->getKey()])

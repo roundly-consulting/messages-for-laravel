@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\PrivateChannel;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('returns custom data for broadcasting', function () {
-    $thread = messaging()->threads()->create(name: 'Hello Everyone!');
+    $thread = Messages::start('Hello Everyone!')->create();
 
     expect($thread->broadcastWith('created'))
         ->toBe([
@@ -21,7 +22,7 @@ it('returns custom data for broadcasting', function () {
 it('returns no channels to broadcast on when broadcasting is turned off or event is not created', function () {
     config()->set('messages.broadcasting.enabled', false);
 
-    $thread = messaging()->threads()->create(name: 'Hello Everyone!');
+    $thread = Messages::start('Hello Everyone!')->create();
 
     expect($thread->broadcastOn('created'))->toBe([]);
 
@@ -33,10 +34,7 @@ it('returns no channels to broadcast on when broadcasting is turned off or event
 it('returns public channel to broadcast on when thread is public', function () {
     config()->set('messages.broadcasting.enabled', true);
 
-    $thread = messaging()->threads()->create(
-        name: 'Hello Everyone!',
-        isPublic: true,
-    );
+    $thread = Messages::start('Hello Everyone!')->public()->create();
 
     expect($thread->broadcastOn('created'))
         ->toBeInstanceOf(Channel::class)
@@ -46,13 +44,10 @@ it('returns public channel to broadcast on when thread is public', function () {
 it('returns private channels to broadcast on when thread is private', function () {
     config()->set('messages.broadcasting.enabled', true);
 
-    $thread = messaging()->threads()->create(
-        name: 'Hello Everyone!',
-        isPublic: false,
-    );
+    $thread = Messages::start('Hello Everyone!')->private()->create();
 
-    messaging()->participants()->addParticipantToThread($thread, User::create());
-    messaging()->participants()->addParticipantToThread($thread, User::create());
+    Messages::thread($thread)->participants()->add(User::create());
+    Messages::thread($thread)->participants()->add(User::create());
 
     $channels = $thread->refresh()->broadcastOn('created');
 
@@ -70,10 +65,7 @@ it('returns private channels to broadcast on when thread is private', function (
 it('returns event name for broadcasting', function () {
     config()->set('messages.broadcasting.enabled', true);
 
-    $thread = messaging()->threads()->create(
-        name: 'Hello Everyone!',
-        isPublic: false,
-    );
+    $thread = Messages::start('Hello Everyone!')->private()->create();
 
     expect($thread->broadcastAs('created'))->toBe('messaging.thread.created');
 });

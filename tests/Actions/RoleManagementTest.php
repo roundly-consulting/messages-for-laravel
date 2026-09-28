@@ -14,6 +14,7 @@ use RoundlyConsulting\Messages\Actions\StartThread;
 use RoundlyConsulting\Messages\Actions\TransferOwnership;
 use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\DataTransferObjects\RemoveParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\SetParticipantRoleData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadArchived;
@@ -179,7 +180,7 @@ it('forbids a member from removing another participant', function () {
     $member = User::create();
     $thread = crew($owner, $member);
 
-    app(RemoveParticipant::class)->execute(new AddParticipantData(
+    app(RemoveParticipant::class)->execute(new RemoveParticipantData(
         thread: $thread,
         participant: $owner,
         actor: $member,
@@ -191,7 +192,7 @@ it('lets a member leave (remove themselves) without manage rights', function () 
     $member = User::create();
     $thread = crew($owner, $member);
 
-    app(RemoveParticipant::class)->execute(new AddParticipantData(
+    app(RemoveParticipant::class)->execute(new RemoveParticipantData(
         thread: $thread,
         participant: $member,
         actor: $member,

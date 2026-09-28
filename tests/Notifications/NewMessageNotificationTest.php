@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Notification;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Events\MessageSent;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Listeners\NotifyParticipantsOfNewMessage;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
@@ -86,7 +87,7 @@ it('builds the notification payload and channels from config', function () {
     config()->set('messages.notifications.channels', ['mail', 'database']);
 
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
         sender: $user,

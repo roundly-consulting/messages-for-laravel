@@ -15,9 +15,9 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
-    $this->thread = messaging()->threads()->create(name: 'Chat');
+    $this->thread = Messages::start('Chat')->create();
     $this->author = User::create();
-    $this->message = messaging()->messages()->sendMessage($this->thread, $this->author, 'first');
+    $this->message = Messages::send($this->thread, $this->author, 'first');
 });
 
 it('edits a message and dispatches MessageEdited', function () {

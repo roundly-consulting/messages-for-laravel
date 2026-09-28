@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -13,7 +14,7 @@ it('adds participant to thread', function () {
 
     $user = User::create();
 
-    $thread = messaging()->threads()->create(name: 'Very secret channel', isPublic: false);
+    $thread = Messages::start('Very secret channel')->private()->create();
 
     expect($thread->last_activity_at)
         ->toBeInstanceOf(Carbon::class)
@@ -24,7 +25,7 @@ it('adds participant to thread', function () {
         $lastActivityAt = now()->addMinutes(5),
     );
 
-    $participant = messaging()->participants()->addParticipantToThread(thread: $thread, participant: $user);
+    $participant = Messages::thread($thread)->participants()->add($user);
 
     expect($participant)->toBeInstanceOf(Participant::class);
 

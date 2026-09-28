@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('filters direct threads with the direct scope', function () {
-    messaging()->threads()->create(name: 'Group');
+    Messages::start('Group')->create();
     Thread::factory()->direct()->create();
 
     expect(Thread::query()->direct()->count())->toBe(1);
@@ -17,9 +18,9 @@ it('filters direct threads with the direct scope', function () {
 
 it('lists threads for a participant ordered by activity', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Mine');
-    messaging()->participants()->addParticipantToThread($thread, $user);
-    messaging()->threads()->create(name: 'Not mine');
+    $thread = Messages::start('Mine')->create();
+    Messages::thread($thread)->participants()->add($user);
+    Messages::start('Not mine')->create();
 
     $threads = Thread::query()->forParticipant($user)->get();
 
@@ -36,7 +37,7 @@ it('matches a direct thread with the between scope', function () {
 });
 
 it('finds unread participants with the unread scope', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     Participant::factory()->inThread($thread)->unread()->create();
     Participant::factory()->inThread($thread)->read()->create();
 
@@ -46,9 +47,9 @@ it('finds unread participants with the unread scope', function () {
 it('finds unread messages for a participant', function () {
     $alice = User::create();
     $bob = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
-    messaging()->participants()->addParticipantToThread($thread, $bob);
-    messaging()->messages()->sendMessage($thread, $alice, 'unread one');
+    $thread = Messages::start('Chat')->create();
+    Messages::thread($thread)->participants()->add($bob);
+    Messages::send($thread, $alice, 'unread one');
 
     expect(Message::query()->unreadFor($bob)->count())->toBe(1);
 });

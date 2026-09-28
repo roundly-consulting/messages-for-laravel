@@ -7,16 +7,18 @@ use RoundlyConsulting\Messages\Actions\AddParticipant;
 use RoundlyConsulting\Messages\Actions\LeaveThread;
 use RoundlyConsulting\Messages\Actions\RemoveParticipant;
 use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
+use RoundlyConsulting\Messages\DataTransferObjects\RemoveParticipantData;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Events\ParticipantJoined;
 use RoundlyConsulting\Messages\Events\ParticipantLeft;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('adds a participant and dispatches ParticipantJoined', function () {
     Event::fake();
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $user = User::create();
 
     $participant = app(AddParticipant::class)->execute(new AddParticipantData($thread, $user));
@@ -29,11 +31,11 @@ it('adds a participant and dispatches ParticipantJoined', function () {
 it('removes a participant and dispatches ParticipantLeft', function () {
     Event::fake();
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $user = User::create();
     app(AddParticipant::class)->execute(new AddParticipantData($thread, $user));
 
-    app(RemoveParticipant::class)->execute(new AddParticipantData($thread, $user));
+    app(RemoveParticipant::class)->execute(new RemoveParticipantData($thread, $user));
 
     expect($thread->participants()->count())->toBe(0)
         ->and($thread->participants()->withTrashed()->count())->toBe(1);
@@ -42,17 +44,17 @@ it('removes a participant and dispatches ParticipantLeft', function () {
 });
 
 it('throws when removing a non-participant', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
-    app(RemoveParticipant::class)->execute(new AddParticipantData($thread, User::create()));
+    app(RemoveParticipant::class)->execute(new RemoveParticipantData($thread, User::create()));
 })->throws(ParticipationException::class);
 
 it('lets a participant leave a thread', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $user = User::create();
     app(AddParticipant::class)->execute(new AddParticipantData($thread, $user));
 
-    app(LeaveThread::class)->execute(new AddParticipantData($thread, $user));
+    app(LeaveThread::class)->execute($thread, $user);
 
     expect($thread->participants()->count())->toBe(0);
 });
@@ -60,11 +62,11 @@ it('lets a participant leave a thread', function () {
 it('writes join and leave system messages when enabled', function () {
     config()->set('messages.system-messages.enabled', true);
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $user = User::create();
 
     app(AddParticipant::class)->execute(new AddParticipantData($thread, $user));
-    app(RemoveParticipant::class)->execute(new AddParticipantData($thread, $user));
+    app(RemoveParticipant::class)->execute(new RemoveParticipantData($thread, $user));
 
     $systemMessages = $thread->messages()->where('type', MessageType::System->value)->get();
 
@@ -74,7 +76,7 @@ it('writes join and leave system messages when enabled', function () {
 it('writes no system messages when disabled', function () {
     config()->set('messages.system-messages.enabled', false);
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     app(AddParticipant::class)->execute(new AddParticipantData($thread, User::create()));
 
     expect($thread->messages()->count())->toBe(0);

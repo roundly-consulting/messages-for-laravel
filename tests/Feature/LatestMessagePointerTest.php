@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Messages\Actions\PruneMessages;
 use RoundlyConsulting\Messages\Concerns\MaintainsThreadLatestMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -27,16 +28,16 @@ use RoundlyConsulting\Messages\Tests\Models\User;
  */
 it('keeps the caller thread instance correct across a send', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
     // No refresh: this is the instance the host handed us, and the one they still hold.
-    messaging()->messages()->sendMessage($thread, $user, 'first');
+    Messages::send($thread, $user, 'first');
 
     expect($thread->latestMessage?->message)->toBe('first')
         ->and($thread->latestMessagePreview())->toBe('first');
 
-    messaging()->messages()->sendMessage($thread, $user, 'second');
+    Messages::send($thread, $user, 'second');
 
     // ...and again: the relation must not cache the first answer.
     expect($thread->latestMessage?->message)->toBe('second')
@@ -72,13 +73,13 @@ it('leaves a held thread instance behind a raw model write until refreshed', fun
  */
 it('recomputes the pointer after a bulk prune', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    $old = messaging()->messages()->sendMessage($thread, $user, 'ancient');
+    $old = Messages::send($thread, $user, 'ancient');
     $old->forceFill(['created_at' => now()->subYears(2)])->saveQuietly();
 
-    $kept = messaging()->messages()->sendMessage($thread, $user, 'recent');
+    $kept = Messages::send($thread, $user, 'recent');
 
     app(PruneMessages::class)->execute(new PruneMessagesData(days: 90));
 
@@ -89,10 +90,10 @@ it('recomputes the pointer after a bulk prune', function (): void {
 /** Pruning a thread's entire history leaves it pointing at nothing, not at a deleted row. */
 it('clears the pointer when a prune removes every message', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    $only = messaging()->messages()->sendMessage($thread, $user, 'ancient');
+    $only = Messages::send($thread, $user, 'ancient');
     $only->forceFill(['created_at' => now()->subYears(2)])->saveQuietly();
 
     app(PruneMessages::class)->execute(new PruneMessagesData(days: 90));

@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Exceptions;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\Models\Participant;
 
 final class ParticipationException extends Exception
 {
@@ -27,5 +28,23 @@ final class ParticipationException extends Exception
         ]);
 
         return new self(is_string($message) ? $message : 'Not a participant of this thread.');
+    }
+
+    public static function inAnotherThread(Participant $participant): self
+    {
+        $message = trans('messages::messages.scope.participant-in-another-thread', [
+            'participant' => (string) $participant->getKey(),
+        ]);
+
+        return new self(is_string($message) ? $message : 'The participant belongs to another thread.');
+    }
+
+    public static function participantMissing(Participant $participant): self
+    {
+        $message = trans('messages::messages.participation.participant-missing', [
+            'participant' => (string) $participant->getKey(),
+        ]);
+
+        return new self(is_string($message) ? $message : 'The participating model no longer exists.');
     }
 }

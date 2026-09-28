@@ -20,7 +20,7 @@ beforeEach(function (): void {
 
 function sentMessage(): Message
 {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     return $thread->messages()->create([
         'sender_id' => User::create()->id,
@@ -71,7 +71,7 @@ it('queues nothing when warming is disabled', function (): void {
 it('queues the warm-variants listener when a message is sent', function (): void {
     Queue::fake();
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = Messages::to($thread)->from(User::create())
         ->attach(UploadedFile::fake()->image('upload.jpg', 400, 300))
         ->send('with an image');

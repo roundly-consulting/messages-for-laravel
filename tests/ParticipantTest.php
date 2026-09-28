@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Event;
+use RoundlyConsulting\Messages\Events\ThreadRead;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\Restaurant;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
     $this->user = User::create();
-    $this->thread = messaging()->threads()->create(name: 'Hello Everyone!');
-    $this->participant = messaging()->participants()->addParticipantToThread($this->thread, $this->user);
+    $this->thread = Messages::start('Hello Everyone!')->create();
+    $this->participant = Messages::thread($this->thread)->participants()->add($this->user);
 });
 
 it('returns thread from participant', function () {
@@ -19,7 +22,7 @@ it('returns thread from participant', function () {
 });
 
 it('throws exception when participant entity does not implement ParticipatesInMessaging interface', function () {
-    $participant = messaging()->participants()->addParticipantToThread($this->thread, Restaurant::create());
+    $participant = Messages::thread($this->thread)->participants()->add(Restaurant::create());
 
     $participant->broadcastWith('created');
 })->expectException(ParticipationException::class);
@@ -60,3 +63,22 @@ it('returns event name for broadcasting', function () {
 
     expect($this->participant->broadcastAs('created'))->toBe('messaging.participant.joined');
 });
+
+it('marks itself read through the manager, firing ThreadRead', function () {
+    Event::fake([ThreadRead::class]);
+    Messages::send($this->thread, User::create(), 'hi');
+
+    $returned = $this->participant->markAsRead();
+
+    expect($returned)->toBe($this->participant)
+        ->and($this->participant->read_at)->not->toBeNull()
+        ->and($this->participant->isDirty())->toBeFalse()
+        ->and($this->participant->last_read_message_id)->toBe($this->thread->fresh()->last_message_id);
+    Event::assertDispatched(ThreadRead::class);
+});
+
+it('refuses to mark read for a participant whose model is gone', function () {
+    $this->user->delete();
+
+    $this->participant->fresh()->markAsRead();
+})->throws(ParticipationException::class);

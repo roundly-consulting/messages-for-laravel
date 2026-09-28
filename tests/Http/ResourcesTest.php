@@ -42,7 +42,7 @@ it('shapes a thread resource with eager-loaded relations', function () {
 });
 
 it('omits unloaded thread relations safely', function () {
-    $thread = messaging()->threads()->create(name: 'Bare');
+    $thread = Messages::start('Bare')->create();
 
     $payload = ThreadResource::make($thread)->toArray(Request::create('/'));
 
@@ -60,7 +60,7 @@ it('omits unloaded thread relations safely', function () {
 
 it('shapes a message resource including the sender and reply info', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'original'));
     $reply = app(SendMessage::class)->execute(new SendMessageData(
@@ -86,7 +86,7 @@ it('shapes a message resource including the sender and reply info', function () 
 
 it('nulls the body for a deleted message resource', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'bye'));
     $message->delete();
 
@@ -100,7 +100,7 @@ it('nulls the body for a deleted message resource', function () {
 
 it('reports an edited timestamp once a text message changes', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'first'));
 
     expect(MessageResource::make($message)->toArray(Request::create('/'))['edited_at'])->toBeNull();
@@ -128,7 +128,7 @@ it('shapes a participant resource', function () {
 });
 
 it('falls back to ids when the participant model does not participate', function () {
-    $thread = messaging()->threads()->create(name: 'Crew');
+    $thread = Messages::start('Crew')->create();
     $restaurant = Restaurant::create();
     $thread->participants()->create([
         'participant_id' => $restaurant->getKey(),

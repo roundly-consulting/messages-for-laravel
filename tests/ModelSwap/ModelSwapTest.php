@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\CustomMessage;
 use RoundlyConsulting\Messages\Tests\Models\CustomParticipant;
 use RoundlyConsulting\Messages\Tests\Models\CustomThread;
@@ -30,12 +31,12 @@ use RoundlyConsulting\Messages\Tests\Models\User;
  */
 it('honours a host thread model through the real start-thread flow', function (): void {
     expect('messages.models.thread')->toHonourModelSwap(CustomThread::class, function (): array {
-        $thread = messaging()->threads()->create(name: 'Swapped crew');
+        $thread = Messages::start('Swapped crew')->create();
 
         return [
             $thread,
             // The inbox listing hydrates through the package's own query, not the seam.
-            ...messaging()->threads()->paginate()->getCollection()->all(),
+            ...Messages::threads()->getCollection()->all(),
         ];
     });
 });
@@ -43,20 +44,16 @@ it('honours a host thread model through the real start-thread flow', function ()
 it('honours a host message model through the real send flow', function (): void {
     expect('messages.models.message')->toHonourModelSwap(CustomMessage::class, function (): array {
         $sender = User::create();
-        $thread = messaging()->threads()->create(name: 'Swapped send');
+        $thread = Messages::start('Swapped send')->create();
 
-        $message = messaging()->messages()->sendMessage(
-            thread: $thread,
-            sender: $sender,
-            message: 'sent through the swapped model',
-        );
+        $message = Messages::send($thread, $sender, 'sent through the swapped model');
 
         return [
             $message,
             // latestMessage() is the relation this row also fixed; it must hydrate the
             // host's class, not the packaged one.
             $thread->latestMessage()->first(),
-            ...messaging()->messages()->paginate(thread: $thread)->getCollection()->all(),
+            ...Messages::thread($thread)->messages()->getCollection()->all(),
         ];
     });
 });
@@ -64,9 +61,9 @@ it('honours a host message model through the real send flow', function (): void 
 it('honours a host participant model when a thread is joined', function (): void {
     expect('messages.models.participant')->toHonourModelSwap(CustomParticipant::class, function (): array {
         $owner = User::create();
-        $thread = messaging()->threads()->create(name: 'Swapped join');
+        $thread = Messages::start('Swapped join')->create();
 
-        $participant = messaging()->participants()->addParticipantToThread($thread, $owner);
+        $participant = Messages::thread($thread)->participants()->add($owner);
 
         return [
             $participant,

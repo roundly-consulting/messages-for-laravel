@@ -14,12 +14,12 @@ beforeEach(function () {
     config()->set('messages.permissions.enabled', false);
 });
 
-it('finds or creates the direct thread with between()', function () {
+it('finds or creates the direct thread with direct()', function () {
     $a = User::create();
     $b = User::create();
 
-    $first = Messages::between($a, $b);
-    $second = Messages::between($a, $b);
+    $first = Messages::direct($a, $b);
+    $second = Messages::direct($a, $b);
 
     expect($first->is_direct)->toBeTrue()
         ->and($first->getKey())->toBe($second->getKey());
@@ -102,7 +102,7 @@ it('broadcasts a typing signal only when broadcasting is enabled', function () {
 
 it('previews the latest message in a type-aware way', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     expect($thread->latestMessagePreview())->toBeNull();
 
@@ -122,7 +122,7 @@ it('previews the latest message in a type-aware way', function () {
 
 it('previews the latest message when the relation is already loaded', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, $user, 'loaded'));
 
     $loaded = $thread->load('latestMessage');

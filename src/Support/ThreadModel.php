@@ -26,11 +26,4 @@ final class ThreadModel
 
         return is_a($model, Thread::class, true) ? $model : Thread::class;
     }
-
-    public static function new(): Thread
-    {
-        $model = self::class();
-
-        return new $model;
-    }
 }

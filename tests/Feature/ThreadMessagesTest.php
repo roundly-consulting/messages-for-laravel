@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -12,15 +13,11 @@ it('writes message to thread and bumps last activity', function () {
 
     Carbon::setTestNow($createdAt = now());
 
-    $thread = messaging()->threads()->create(name: 'Important messages only');
+    $thread = Messages::start('Important messages only')->create();
 
     Carbon::setTestNow($sentAt = now()->addMinutes(5));
 
-    $message = messaging()->messages()->sendMessage(
-        thread: $thread,
-        sender: $user,
-        message: 'I know but...',
-    );
+    $message = Messages::send($thread, $user, 'I know but...');
 
     expect($message)->toBeInstanceOf(Message::class)
         ->and($thread->refresh()->last_activity_at->format('Y-m-d H:i'))
@@ -41,17 +38,11 @@ it('writes message to thread and bumps last activity', function () {
 it('paginates messages from thread', function () {
     $user = User::create();
 
-    $thread = messaging()->threads()->create(name: 'Its Friday then Then Saturday, Sunday');
+    $thread = Messages::start('Its Friday then Then Saturday, Sunday')->create();
 
-    $message = messaging()->messages()->sendMessage(
-        thread: $thread,
-        sender: $user,
-        message: 'What!',
-    );
+    $message = Messages::send($thread, $user, 'What!');
 
-    $messagesForThread = messaging()->messages()->paginate(
-        thread: $thread,
-    );
+    $messagesForThread = Messages::thread($thread)->messages();
 
     expect($messagesForThread)
         ->toBeInstanceOf(LengthAwarePaginator::class)

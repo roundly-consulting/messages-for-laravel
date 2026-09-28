@@ -7,20 +7,11 @@ namespace RoundlyConsulting\Messages\Concerns;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use RoundlyConsulting\Messages\Actions\AddParticipant;
-use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
-use RoundlyConsulting\Messages\Actions\MarkRead;
-use RoundlyConsulting\Messages\Actions\SendMessage;
-use RoundlyConsulting\Messages\Actions\StartThread;
-use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
-use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
-use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
-use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
-use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
@@ -28,7 +19,8 @@ use RoundlyConsulting\Messages\Support\ThreadModel;
  * Ergonomic messaging helpers for a participant model.
  *
  * The host model must also implement
- * {@see ParticipatesInMessaging}.
+ * {@see ParticipatesInMessaging}. Every write goes through the {@see MessagesManager}, so
+ * `Messages::fake()` records it like a facade call.
  *
  * @mixin Model
  */
@@ -74,25 +66,18 @@ trait HasMessaging
             ? [$participants]
             : [...$participants];
 
-        return app(StartThread::class)->execute(new CreateThreadData(
-            name: $name,
-            participants: [$this, ...$others],
-        ));
+        return app(MessagesManager::class)->start($name)->withParticipants([$this, ...$others])->create();
     }
 
     /** Find or create the 1:1 direct thread between this model and the other. */
     public function conversationWith(Model $other): Thread
     {
-        return app(FindOrCreateDirectThread::class)->execute($this, $other);
+        return app(MessagesManager::class)->direct($this, $other);
     }
 
     public function sendMessageTo(Thread $thread, string $body): Message
     {
-        return app(SendMessage::class)->execute(new SendMessageData(
-            thread: $thread,
-            sender: $this,
-            body: $body,
-        ));
+        return app(MessagesManager::class)->to($thread)->from($this)->send($body);
     }
 
     /** Ensure this model is a participant of the given thread. */
@@ -104,7 +89,7 @@ trait HasMessaging
             return $existing;
         }
 
-        return app(AddParticipant::class)->execute(new AddParticipantData($thread, $this));
+        return app(MessagesManager::class)->thread($thread)->participants()->add($this);
     }
 
     /**
@@ -122,17 +107,11 @@ trait HasMessaging
     /** Total unread messages across all threads, or within one thread. */
     public function unreadCount(?Thread $thread = null): int
     {
-        if ($thread !== null) {
-            return $thread->unreadCountFor($this);
-        }
-
-        $model = MessageModel::class();
-
-        return $model::query()->unreadFor($this)->count();
+        return app(MessagesManager::class)->unreadCount($this, $thread);
     }
 
     public function markThreadRead(Thread $thread): Participant
     {
-        return app(MarkRead::class)->execute(new MarkReadData($thread, $this));
+        return app(MessagesManager::class)->markRead($thread, $this);
     }
 }

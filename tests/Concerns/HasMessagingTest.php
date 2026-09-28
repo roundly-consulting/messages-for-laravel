@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\Company;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -67,7 +68,7 @@ it('lists unread threads and marks them read', function () {
 });
 
 it('joins an existing thread idempotently', function () {
-    $thread = messaging()->threads()->create(name: 'Open');
+    $thread = Messages::start('Open')->create();
 
     $this->alice->joinThread($thread);
     $this->alice->joinThread($thread);

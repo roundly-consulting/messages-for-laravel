@@ -16,7 +16,7 @@ use RoundlyConsulting\Messages\Tests\Models\User;
  * unrelatable on any engine that actually checks types. They shipped as `uuid`.
  */
 it('defaults to auto-incrementing bigint primary keys', function (): void {
-    $thread = messaging()->threads()->create(name: 'Hello');
+    $thread = Messages::start('Hello')->create();
 
     expect($thread->id)->toBeInt()
         ->and($thread->getKeyType())->toBe('int')
@@ -62,10 +62,10 @@ it('tracks the primary key across all four internal foreign keys', function (): 
 
 it('sends, threads and replies across the bigint foreign keys', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    $message = messaging()->messages()->sendMessage($thread, $user, 'first');
+    $message = Messages::send($thread, $user, 'first');
     $reply = Messages::to($thread)->from($user)->replyingTo($message)->send('second');
 
     expect($reply->parent_message_id)->toBe($message->id)
@@ -78,7 +78,7 @@ it('sends, threads and replies across the bigint foreign keys', function (): voi
  * default — `anything↔messages` is the same shape as the proven `posts↔likes` vector.
  */
 it('produces an id a bigint morph column can hold', function (): void {
-    $thread = messaging()->threads()->create(name: 'Hello');
+    $thread = Messages::start('Hello')->create();
 
     Schema::create('bigint_morph_probe', function ($table): void {
         $table->id();
@@ -108,12 +108,12 @@ it('keeps the id desc tiebreak monotonic on bigint keys', function (): void {
     Carbon::setTestNow('2026-07-17 12:00:00');
 
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    messaging()->messages()->sendMessage($thread, $user, 'first');
-    messaging()->messages()->sendMessage($thread, $user, 'second');
-    $last = messaging()->messages()->sendMessage($thread, $user, 'third');
+    Messages::send($thread, $user, 'first');
+    Messages::send($thread, $user, 'second');
+    $last = Messages::send($thread, $user, 'third');
 
     $ids = Message::query()->where('thread_id', $thread->id)->pluck('id')->all();
 

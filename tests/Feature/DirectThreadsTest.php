@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\Company;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -32,10 +33,10 @@ it('does not match a group thread with the same two members', function () {
     $bob = User::create();
     $carol = User::create();
 
-    $group = messaging()->threads()->create(name: 'Group');
-    messaging()->participants()->addParticipantToThread($group, $alice);
-    messaging()->participants()->addParticipantToThread($group, $bob);
-    messaging()->participants()->addParticipantToThread($group, $carol);
+    $group = Messages::start('Group')->create();
+    Messages::thread($group)->participants()->add($alice);
+    Messages::thread($group)->participants()->add($bob);
+    Messages::thread($group)->participants()->add($carol);
 
     $dm = app(FindOrCreateDirectThread::class)->execute($alice, $bob);
 
@@ -47,9 +48,9 @@ it('does not match a two-member group thread that is not direct', function () {
     $alice = User::create();
     $bob = User::create();
 
-    $group = messaging()->threads()->create(name: 'Pair group');
-    messaging()->participants()->addParticipantToThread($group, $alice);
-    messaging()->participants()->addParticipantToThread($group, $bob);
+    $group = Messages::start('Pair group')->create();
+    Messages::thread($group)->participants()->add($alice);
+    Messages::thread($group)->participants()->add($bob);
 
     $dm = app(FindOrCreateDirectThread::class)->execute($alice, $bob);
 

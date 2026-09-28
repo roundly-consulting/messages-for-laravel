@@ -10,10 +10,10 @@ use RoundlyConsulting\Messages\Tests\Models\User;
 /** The seam's ulid leg. @see UuidKeyTest */
 it('mints ulid primary keys and tracks them across the internal foreign keys', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    $message = messaging()->messages()->sendMessage($thread, $user, 'first');
+    $message = Messages::send($thread, $user, 'first');
     $reply = Messages::to($thread)->from($user)->replyingTo($message)->send('second');
 
     expect($thread->id)->toBeString()->toHaveLength(26)
@@ -30,11 +30,11 @@ it('keeps the id desc tiebreak monotonic on ulid keys', function (): void {
     Carbon::setTestNow('2026-07-17 12:00:00');
 
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    messaging()->messages()->sendMessage($thread, $user, 'first');
-    $last = messaging()->messages()->sendMessage($thread, $user, 'second');
+    Messages::send($thread, $user, 'first');
+    $last = Messages::send($thread, $user, 'second');
 
     expect($thread->fresh()->latestMessage->message)->toBe('second')
         ->and($thread->fresh()->latestMessage->id)->toBe($last->id);

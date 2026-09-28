@@ -3,19 +3,20 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Enums\MessageType;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('defaults a message type to text and casts the enum', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
-    $message = messaging()->messages()->sendMessage($thread, User::create(), 'hi');
+    $thread = Messages::start('Chat')->create();
+    $message = Messages::send($thread, User::create(), 'hi');
 
     expect($message->refresh()->type)->toBe(MessageType::Text);
 });
 
 it('casts a system message meta to an array', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = Message::factory()->inThread($thread)->system()->create(['meta' => ['k' => 'v']]);
 
     expect($message->refresh()->meta)->toBe(['k' => 'v'])

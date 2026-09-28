@@ -5,13 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Testing;
 
 use Illuminate\Database\Eloquent\Model;
-use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
-use RoundlyConsulting\Messages\Actions\MarkRead;
-use RoundlyConsulting\Messages\Actions\SendMessage;
-use RoundlyConsulting\Messages\Actions\StartThread;
-use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
-use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
-use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
@@ -37,33 +31,24 @@ trait InteractsWithMessaging
     /** Start a group conversation between the given participants. */
     public function startConversation(Model ...$participants): Thread
     {
-        return app(StartThread::class)->execute(new CreateThreadData(
-            participants: array_values($participants),
-        ));
+        return app(MessagesManager::class)->start()->withParticipants(array_values($participants))->create();
     }
 
     /** Find or create the direct thread between two participants. */
     public function directThread(Model $first, Model $second): Thread
     {
-        return app(FindOrCreateDirectThread::class)->execute($first, $second);
+        return app(MessagesManager::class)->direct($first, $second);
     }
 
     /** Send a message as the remembered (or given) actor. */
     public function sendMessageAs(Thread $thread, string $body, ?Model $actor = null): Message
     {
-        return app(SendMessage::class)->execute(new SendMessageData(
-            thread: $thread,
-            sender: $this->messagingActorOrFail($actor),
-            body: $body,
-        ));
+        return app(MessagesManager::class)->to($thread)->from($this->messagingActorOrFail($actor))->send($body);
     }
 
     public function markReadAs(Thread $thread, ?Model $actor = null): Participant
     {
-        return app(MarkRead::class)->execute(new MarkReadData(
-            $thread,
-            $this->messagingActorOrFail($actor),
-        ));
+        return app(MessagesManager::class)->markRead($thread, $this->messagingActorOrFail($actor));
     }
 
     private function messagingActorOrFail(?Model $actor): Model

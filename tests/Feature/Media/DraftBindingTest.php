@@ -6,7 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use RoundlyConsulting\MediaLibrary\Exceptions\DraftMediaNotFound;
-use RoundlyConsulting\MediaLibrary\Facades\Media;
+use RoundlyConsulting\MediaLibrary\Facades\MediaLibrary;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
@@ -19,14 +19,14 @@ beforeEach(function (): void {
 
 function draftToken(string $name = 'draft.jpg'): string
 {
-    return (string) Media::draft(UploadedFile::fake()->image($name, 400, 300))
+    return (string) MediaLibrary::draft(UploadedFile::fake()->image($name, 400, 300))
         ->toBucket('attachments')
         ->draft_token;
 }
 
 it('binds a draft media token to the sent message', function (): void {
     $token = draftToken();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)->from(User::create())
         ->withAttachment($token)
@@ -40,7 +40,7 @@ it('binds a draft media token to the sent message', function (): void {
 });
 
 it('binds several draft tokens at once', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)->from(User::create())
         ->withAttachments([draftToken('one.jpg'), draftToken('two.jpg')])
@@ -50,7 +50,7 @@ it('binds several draft tokens at once', function (): void {
 });
 
 it('attaches an uploaded file on send', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)->from(User::create())
         ->attach(UploadedFile::fake()->image('upload.jpg', 400, 300))
@@ -62,7 +62,7 @@ it('attaches an uploaded file on send', function (): void {
 
 it('exposes attachments to MessageSent listeners', function (): void {
     $token = draftToken();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $seen = null;
     Event::listen(MessageSent::class, function (MessageSent $event) use (&$seen): void {
@@ -75,7 +75,7 @@ it('exposes attachments to MessageSent listeners', function (): void {
 });
 
 it('rolls the send back when a draft token is unknown', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     try {
         Messages::to($thread)->from(User::create())
@@ -90,7 +90,7 @@ it('rolls the send back when a draft token is unknown', function (): void {
 });
 
 it('sends a plain message unchanged when no attachments are given', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = Messages::to($thread)->from(User::create())->send('plain');
 

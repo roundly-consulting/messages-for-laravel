@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('creates thread', function () {
     $this->freezeTime(function (Carbon $datetime) {
-        $thread = messaging()->threads()->create(
-            name: 'Hello Everyone!',
-        );
+        $thread = Messages::start('Hello Everyone!')->create();
 
         expect($thread)->toBeInstanceOf(Thread::class);
 
@@ -29,7 +28,7 @@ it('creates thread and uses config values as defaults for visibility and allowan
         config()->set('messages.publicity.public-by-default', $public);
         config()->set('messages.publicity.everyone-can-join', $canJoin);
 
-        messaging()->threads()->create(name: $name);
+        Messages::start($name)->create();
 
         $this->assertDatabaseHas('messaging_threads', [
             'name' => $name,
@@ -44,10 +43,7 @@ it('creates thread and uses config values as defaults for visibility and allowan
 
 it('creates thread that is publicly viewable', function () {
     $this->freezeTime(function (Carbon $datetime) {
-        $thread = messaging()->threads()->create(
-            name: 'Readonly public chat',
-            isPublic: true,
-        );
+        $thread = Messages::start('Readonly public chat')->public()->create();
 
         expect($thread)->toBeInstanceOf(Thread::class);
 
@@ -62,11 +58,7 @@ it('creates thread that is publicly viewable', function () {
 
 it('creates thread that is publicly viewable and people can join', function () {
     $this->freezeTime(function (Carbon $datetime) {
-        $thread = messaging()->threads()->create(
-            name: 'Readonly public chat',
-            isPublic: true,
-            everyoneCanJoin: true,
-        );
+        $thread = Messages::start('Readonly public chat')->public()->everyoneCanJoin()->create();
 
         expect($thread)->toBeInstanceOf(Thread::class);
 
@@ -80,10 +72,10 @@ it('creates thread that is publicly viewable and people can join', function () {
 });
 
 it('paginates public threads', function () {
-    messaging()->threads()->create(name: 'Public announcement', isPublic: true);
-    messaging()->threads()->create(name: 'Public announcement', isPublic: false);
+    Messages::start('Public announcement')->public()->create();
+    Messages::start('Public announcement')->private()->create();
 
-    $threads = messaging()->threads()->paginate();
+    $threads = Messages::threads();
 
     expect($threads)
         ->toBeInstanceOf(LengthAwarePaginator::class)
@@ -97,7 +89,7 @@ it('paginates public threads', function () {
 });
 
 /**
- * The order here changed with the tiebreak added to `ThreadsRepository::paginate()`, and the
+ * The order here changed with the tiebreak added to `Messages::threads()`, and the
  * old expectation was an artifact rather than a contract.
  *
  * Both threads are created in the same second, so they tie on `last_activity_at` — the only
@@ -114,12 +106,12 @@ it('paginates threads', function () {
     $user = User::create();
     $anotherUser = User::create();
 
-    messaging()->threads()->create(name: 'Public announcement', isPublic: true);
+    Messages::start('Public announcement')->public()->create();
 
-    $nonPublicThread = messaging()->threads()->create(name: 'Very secret channel', isPublic: false);
-    messaging()->participants()->addParticipantToThread(thread: $nonPublicThread, participant: $user);
+    $nonPublicThread = Messages::start('Very secret channel')->private()->create();
+    Messages::thread($nonPublicThread)->participants()->add($user);
 
-    $threads = messaging()->threads()->paginate(participant: $user);
+    $threads = Messages::threads($user);
 
     expect($threads)
         ->toBeInstanceOf(LengthAwarePaginator::class)
@@ -133,7 +125,7 @@ it('paginates threads', function () {
         ->last()->name
         ->toBe('Public announcement');
 
-    $threads = messaging()->threads()->paginate(participant: $anotherUser);
+    $threads = Messages::threads(for: $anotherUser);
 
     expect($threads)
         ->toBeInstanceOf(LengthAwarePaginator::class)

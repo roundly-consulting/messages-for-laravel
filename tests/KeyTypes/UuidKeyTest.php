@@ -17,10 +17,10 @@ use RoundlyConsulting\Testing\Database\DriverMatrix;
  */
 it('mints uuid primary keys and tracks them across the internal foreign keys', function (): void {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    $message = messaging()->messages()->sendMessage($thread, $user, 'first');
+    $message = Messages::send($thread, $user, 'first');
     $reply = Messages::to($thread)->from($user)->replyingTo($message)->send('second');
 
     expect($thread->id)->toBeString()->toHaveLength(36)
@@ -58,11 +58,11 @@ it('keeps the id desc tiebreak monotonic on uuid keys', function (): void {
     Carbon::setTestNow('2026-07-17 12:00:00');
 
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Hello');
-    messaging()->participants()->addParticipantToThread($thread, $user);
+    $thread = Messages::start('Hello')->create();
+    Messages::thread($thread)->participants()->add($user);
 
-    messaging()->messages()->sendMessage($thread, $user, 'first');
-    $last = messaging()->messages()->sendMessage($thread, $user, 'second');
+    Messages::send($thread, $user, 'first');
+    $last = Messages::send($thread, $user, 'second');
 
     expect($thread->fresh()->latestMessage->message)->toBe('second')
         ->and($thread->fresh()->latestMessage->id)->toBe($last->id);
@@ -83,7 +83,7 @@ it('keeps the id desc tiebreak monotonic on uuid keys', function (): void {
  * hid the bug fleet-wide, and a skip here is the honest report of it.
  */
 it('cannot be stored in a bigint morph column — the cost of a non-bigint key', function (): void {
-    $thread = messaging()->threads()->create(name: 'Hello');
+    $thread = Messages::start('Hello')->create();
 
     Schema::create('bigint_morph_probe', function ($table): void {
         $table->id();

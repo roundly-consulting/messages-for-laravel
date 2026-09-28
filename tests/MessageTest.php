@@ -5,17 +5,14 @@ declare(strict_types=1);
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Carbon;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\Restaurant;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
     $this->user = User::create();
-    $this->thread = messaging()->threads()->create(name: 'Hello Everyone!');
-    $this->message = messaging()->messages()->sendMessage(
-        thread: $this->thread,
-        sender: $this->user,
-        message: 'Yay!',
-    );
+    $this->thread = Messages::start('Hello Everyone!')->create();
+    $this->message = Messages::send($this->thread, $this->user, 'Yay!');
 });
 
 it('returns thread from message', function () {
@@ -27,11 +24,7 @@ it('returns sender from message', function () {
 });
 
 it('throws exception when sender entity does not implement ParticipatesInMessaging interface', function () {
-    $message = messaging()->messages()->sendMessage(
-        thread: $this->thread,
-        sender: Restaurant::create(),
-        message: 'Yay!',
-    );
+    $message = Messages::send($this->thread, Restaurant::create(), 'Yay!');
 
     $message->broadcastWith('created');
 })->expectException(ParticipationException::class);

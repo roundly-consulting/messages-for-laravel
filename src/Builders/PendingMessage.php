@@ -7,11 +7,17 @@ namespace RoundlyConsulting\Messages\Builders;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use RoundlyConsulting\Messages\Actions\SendMessage;
+use RoundlyConsulting\Messages\DataTransferObjects\MessagingCall;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\MessageType;
+use RoundlyConsulting\Messages\Enums\MessagingOperation;
+use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 
+/**
+ * A message being composed for one thread — `Messages::to($thread)`.
+ */
 final class PendingMessage
 {
     private ?Model $sender = null;
@@ -32,7 +38,7 @@ final class PendingMessage
     private array $uploads = [];
 
     public function __construct(
-        private readonly SendMessage $sendMessage,
+        private readonly MessagesManager $manager,
         private readonly Thread $thread,
     ) {}
 
@@ -110,17 +116,21 @@ final class PendingMessage
 
     public function send(?string $body = null): Message
     {
-        $resolvedBody = $body ?? $this->systemKey;
-
-        return $this->sendMessage->execute(new SendMessageData(
+        $data = new SendMessageData(
             thread: $this->thread,
             sender: $this->sender,
-            body: $resolvedBody ?? '',
+            body: $body ?? $this->systemKey ?? '',
             type: $this->type,
             meta: $this->meta,
             parentMessageId: $this->parentMessageId,
             attachments: $this->attachments,
             uploads: $this->uploads,
-        ));
+        );
+
+        return $this->manager->perform(
+            new MessagingCall(MessagingOperation::Send, thread: $this->thread, participant: $this->sender, text: $data->body),
+            SendMessage::class,
+            static fn (SendMessage $action): Message => $action->execute($data),
+        );
     }
 }

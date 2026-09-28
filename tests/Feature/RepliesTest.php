@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('sets the parent on a reply and exposes the relation', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
@@ -35,9 +36,9 @@ it('sets the parent on a reply and exposes the relation', function () {
 
 it('builds a reply through the pending message builder', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
-    $parent = messaging()->messages()->sendMessage($thread, $user, 'first');
+    $parent = Messages::send($thread, $user, 'first');
 
     $reply = app(MessagesManager::class)
         ->to($thread)
@@ -50,7 +51,7 @@ it('builds a reply through the pending message builder', function () {
 
 it('stores a quote snapshot that survives the parent being deleted', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
@@ -75,8 +76,8 @@ it('stores a quote snapshot that survives the parent being deleted', function ()
 
 it('rejects a reply to a message in another thread', function () {
     $user = User::create();
-    $threadA = messaging()->threads()->create(name: 'A');
-    $threadB = messaging()->threads()->create(name: 'B');
+    $threadA = Messages::start('A')->create();
+    $threadB = Messages::start('B')->create();
 
     $parent = app(SendMessage::class)->execute(new SendMessageData(
         thread: $threadA,
@@ -101,7 +102,7 @@ it('rejects a reply to a message in another thread', function () {
  */
 it('rejects a reply to a missing parent message', function () {
     $user = User::create();
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,

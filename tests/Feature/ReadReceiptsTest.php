@@ -8,25 +8,26 @@ use RoundlyConsulting\Messages\Actions\MarkRead;
 use RoundlyConsulting\Messages\DataTransferObjects\MarkReadData;
 use RoundlyConsulting\Messages\Events\ThreadRead;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
     $this->alice = User::create();
     $this->bob = User::create();
-    $this->thread = messaging()->threads()->create(name: 'Chat');
-    messaging()->participants()->addParticipantToThread($this->thread, $this->alice);
-    messaging()->participants()->addParticipantToThread($this->thread, $this->bob);
+    $this->thread = Messages::start('Chat')->create();
+    Messages::thread($this->thread)->participants()->add($this->alice);
+    Messages::thread($this->thread)->participants()->add($this->bob);
 });
 
 it('counts all messages as unread before any read', function () {
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'one');
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'two');
+    Messages::send($this->thread, $this->alice, 'one');
+    Messages::send($this->thread, $this->alice, 'two');
 
     expect($this->thread->unreadCountFor($this->bob))->toBe(2);
 });
 
 it('does not count the participant own messages as unread', function () {
-    messaging()->messages()->sendMessage($this->thread, $this->bob, 'mine');
+    Messages::send($this->thread, $this->bob, 'mine');
 
     expect($this->thread->unreadCountFor($this->bob))->toBe(0);
 });
@@ -34,7 +35,7 @@ it('does not count the participant own messages as unread', function () {
 it('resets unread to zero after marking read and dispatches ThreadRead', function () {
     Event::fake();
 
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'hi');
+    Messages::send($this->thread, $this->alice, 'hi');
 
     $participant = app(MarkRead::class)->execute(new MarkReadData($this->thread, $this->bob));
 
@@ -47,11 +48,11 @@ it('resets unread to zero after marking read and dispatches ThreadRead', functio
 
 it('counts only messages sent after the read pointer', function () {
     Carbon::setTestNow(now());
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'before');
+    Messages::send($this->thread, $this->alice, 'before');
     app(MarkRead::class)->execute(new MarkReadData($this->thread, $this->bob));
 
     Carbon::setTestNow(now()->addMinutes(5));
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'after');
+    Messages::send($this->thread, $this->alice, 'after');
 
     expect($this->thread->unreadCountFor($this->bob))->toBe(1);
 
@@ -59,7 +60,7 @@ it('counts only messages sent after the read pointer', function () {
 });
 
 it('marking read twice stays idempotent', function () {
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'hi');
+    Messages::send($this->thread, $this->alice, 'hi');
 
     app(MarkRead::class)->execute(new MarkReadData($this->thread, $this->bob));
     app(MarkRead::class)->execute(new MarkReadData($this->thread, $this->bob));
@@ -73,7 +74,7 @@ it('throws when marking read for a non-participant', function () {
 
 it('lists participants who have seen a message', function () {
     Carbon::setTestNow(now());
-    $message = messaging()->messages()->sendMessage($this->thread, $this->alice, 'hi');
+    $message = Messages::send($this->thread, $this->alice, 'hi');
 
     Carbon::setTestNow(now()->addMinute());
     app(MarkRead::class)->execute(new MarkReadData($this->thread, $this->bob));
@@ -87,7 +88,7 @@ it('lists participants who have seen a message', function () {
 });
 
 it('exposes participant helper methods for reading', function () {
-    messaging()->messages()->sendMessage($this->thread, $this->alice, 'hi');
+    Messages::send($this->thread, $this->alice, 'hi');
 
     $participant = $this->thread->participants()->whereMorphedTo('participant', $this->bob)->first();
 

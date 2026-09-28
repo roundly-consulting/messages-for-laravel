@@ -8,6 +8,7 @@ use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Events\MessageSent;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 it('sends a message, bumps activity and dispatches MessageSent', function () {
@@ -15,7 +16,7 @@ it('sends a message, bumps activity and dispatches MessageSent', function () {
 
     $user = User::create();
     Carbon::setTestNow($created = now());
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     Carbon::setTestNow($sent = now()->addMinutes(3));
     $message = app(SendMessage::class)->execute(new SendMessageData(
@@ -35,7 +36,7 @@ it('sends a message, bumps activity and dispatches MessageSent', function () {
 });
 
 it('stores system messages with meta and a null sender', function () {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
 
     $message = app(SendMessage::class)->execute(new SendMessageData(
         thread: $thread,
@@ -54,7 +55,7 @@ it('fires events even when broadcasting is disabled', function () {
     config()->set('messages.broadcasting.enabled', false);
     Event::fake();
 
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     app(SendMessage::class)->execute(new SendMessageData($thread, User::create(), 'hi'));
 
     Event::assertDispatched(MessageSent::class);

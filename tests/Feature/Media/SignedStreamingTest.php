@@ -21,7 +21,7 @@ beforeEach(function (): void {
 
 function messageWithImage(string $name = 'photo.jpg'): array
 {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = Messages::to($thread)->from(User::create())->send('hi');
     $media = $message->addMedia(UploadedFile::fake()->image($name, 400, 300))->toMediaBucket('attachments');
 
@@ -70,7 +70,7 @@ it('returns the original preview URL when the variant is not warmed', function (
 });
 
 it('refuses a preview URL for a non-image attachment', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = Messages::to($thread)->from(User::create())->send('hi');
     $pdf = $message->addMedia(UploadedFile::fake()->create('brief.pdf', 12, 'application/pdf'))
         ->toMediaBucket('attachments');
@@ -94,7 +94,7 @@ it('respects the configured temporary URL lifetime', function (): void {
 });
 
 it('streams a non-image attachment through its signed URL', function (): void {
-    $thread = messaging()->threads()->create(name: 'Chat');
+    $thread = Messages::start('Chat')->create();
     $message = Messages::to($thread)->from(User::create())->send('hi');
     /** @var Media $pdf */
     $pdf = $message->addMedia(UploadedFile::fake()->create('brief.pdf', 12, 'application/pdf'))

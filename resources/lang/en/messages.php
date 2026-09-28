@@ -6,11 +6,17 @@ return [
     'participation' => [
         'interface-required' => 'Missing implementation of the :interface interface for class :class.',
         'not-a-participant' => '[:participant] is not a participant of this thread.',
+        'participant-missing' => 'The model behind participant [:participant] no longer exists.',
     ],
 
     'permissions' => [
         'unauthorized' => '[:actor] is not authorized to :action.',
         'requires-role' => '[:actor] requires the :role role to :action.',
+    ],
+
+    'scope' => [
+        'message-in-another-thread' => 'Message [:message] belongs to another thread.',
+        'participant-in-another-thread' => 'Participant [:participant] belongs to another thread.',
     ],
 
     'reply' => [

@@ -90,9 +90,6 @@
         "roundly-consulting/testing-for-laravel": "@dev"
     },
     "autoload": {
-        "files": [
-            "src/Helpers.php"
-        ],
         "psr-4": {
             "RoundlyConsulting\\Messages\\": "src",
             "RoundlyConsulting\\Messages\\Database\\Factories\\": "database/factories"
