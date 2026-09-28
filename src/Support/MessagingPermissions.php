@@ -37,6 +37,19 @@ final class MessagingPermissions
         return $thread->roleOf($actor)?->canManage() === true;
     }
 
+    /**
+     * Only the owner may promote or demote participants, so an admin can neither hand out
+     * admin rights nor take them from a peer.
+     */
+    public static function canSetRoles(Thread $thread, Model $actor): bool
+    {
+        if (! self::enforces($thread)) {
+            return true;
+        }
+
+        return $thread->roleOf($actor)?->isOwner() === true;
+    }
+
     public static function canTransferOwnership(Thread $thread, Model $actor): bool
     {
         if (! self::enforces($thread)) {
@@ -70,6 +83,13 @@ final class MessagingPermissions
     {
         if (! self::canManage($thread, $actor)) {
             throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Admin, $action);
+        }
+    }
+
+    public static function authorizeSetRole(Thread $thread, Model $actor): void
+    {
+        if (! self::canSetRoles($thread, $actor)) {
+            throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'change participant roles');
         }
     }
 

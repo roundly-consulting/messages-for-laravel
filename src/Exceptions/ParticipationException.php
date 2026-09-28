@@ -30,6 +30,13 @@ final class ParticipationException extends Exception
         return new self(is_string($message) ? $message : 'Not a participant of this thread.');
     }
 
+    public static function ownershipOnlyByTransfer(): self
+    {
+        $message = trans('messages::messages.participation.ownership-by-transfer');
+
+        return new self(is_string($message) ? $message : 'Ownership changes hands only through transferOwnership().');
+    }
+
     public static function inAnotherThread(Participant $participant): self
     {
         $message = trans('messages::messages.scope.participant-in-another-thread', [

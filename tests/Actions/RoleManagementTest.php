@@ -21,6 +21,7 @@ use RoundlyConsulting\Messages\Events\ThreadArchived;
 use RoundlyConsulting\Messages\Events\ThreadRenamed;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 function crew(User $owner, User ...$members)
@@ -249,4 +250,71 @@ it('builds an unauthorized exception with a translated message', function () {
 
     $roleException = UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'do that');
     expect($roleException->getMessage())->toContain('owner');
+});
+
+describe('role changes cannot move ownership', function () {
+    beforeEach(function () {
+        config()->set('messages.permissions.enabled', true);
+
+        $this->owner = User::create();
+        $this->admin = User::create();
+        $this->member = User::create();
+        $this->thread = crew($this->owner, $this->admin, $this->member);
+        Messages::thread($this->thread)->participants()->setRole($this->admin, ParticipantRole::Admin, by: $this->owner);
+    });
+
+    it('refuses to grant the owner role through setRole, whoever asks', function (?string $by) {
+        $actor = $by === null ? null : $this->{$by};
+
+        expect(fn () => Messages::thread($this->thread)->participants()->setRole($this->member, ParticipantRole::Owner, by: $actor))
+            ->toThrow(ParticipationException::class, 'transfer');
+
+        expect($this->thread->roleOf($this->member))->toBe(ParticipantRole::Member);
+    })->with(['owner' => 'owner', 'admin' => 'admin', 'trusted caller' => null]);
+
+    it('refuses an admin granting themselves ownership', function () {
+        expect(fn () => Messages::thread($this->thread)->participants()->setRole($this->admin, ParticipantRole::Owner, by: $this->admin))
+            ->toThrow(ParticipationException::class);
+
+        expect($this->thread->roleOf($this->admin))->toBe(ParticipantRole::Admin)
+            ->and($this->thread->roleOf($this->owner))->toBe(ParticipantRole::Owner);
+    });
+
+    it('refuses to change the owner\'s own role through setRole, whoever asks', function (?string $by) {
+        $actor = $by === null ? null : $this->{$by};
+
+        expect(fn () => Messages::thread($this->thread)->participants()->setRole($this->owner, ParticipantRole::Member, by: $actor))
+            ->toThrow(ParticipationException::class, 'transfer');
+
+        expect($this->thread->roleOf($this->owner))->toBe(ParticipantRole::Owner);
+    })->with(['owner' => 'owner', 'trusted caller' => null]);
+
+    it('refuses an admin demoting the owner', function () {
+        expect(fn () => Messages::thread($this->thread)->participants()->setRole($this->owner, ParticipantRole::Member, by: $this->admin))
+            ->toThrow(UnauthorizedMessagingAction::class);
+
+        expect($this->thread->roleOf($this->owner))->toBe(ParticipantRole::Owner);
+    });
+
+    it('leaves promoting and demoting admins to the owner', function () {
+        $participants = Messages::thread($this->thread)->participants();
+
+        expect(fn () => $participants->setRole($this->member, ParticipantRole::Admin, by: $this->admin))
+            ->toThrow(UnauthorizedMessagingAction::class)
+            ->and(fn () => $participants->setRole($this->admin, ParticipantRole::Member, by: $this->admin))
+            ->toThrow(UnauthorizedMessagingAction::class);
+
+        $participants->setRole($this->member, ParticipantRole::Admin, by: $this->owner);
+        $participants->setRole($this->admin, ParticipantRole::Member, by: $this->owner);
+
+        expect($this->thread->roleOf($this->member))->toBe(ParticipantRole::Admin)
+            ->and($this->thread->roleOf($this->admin))->toBe(ParticipantRole::Member);
+    });
+
+    it('still moves ownership through transferOwnership', function () {
+        Messages::thread($this->thread)->participants()->transferOwnership(from: $this->owner, to: $this->admin);
+
+        expect($this->thread->roleOf($this->admin))->toBe(ParticipantRole::Owner)
+            ->and($this->thread->roleOf($this->owner))->toBe(ParticipantRole::Admin);
+    });
 });
