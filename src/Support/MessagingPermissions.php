@@ -56,6 +56,16 @@ final class MessagingPermissions
         return self::canManage($thread, $actor);
     }
 
+    /**
+     * Only the author may edit a message. Unlike deleting, this is never delegated to managers
+     * and never switched off by `messages.permissions.enabled`: rewording someone else's
+     * message puts words in their mouth.
+     */
+    public static function canEditMessage(Message $message, Model $actor): bool
+    {
+        return self::isAuthor($message, $actor);
+    }
+
     public static function authorizeManage(Thread $thread, Model $actor, string $action): void
     {
         if (! self::canManage($thread, $actor)) {
@@ -74,6 +84,13 @@ final class MessagingPermissions
     {
         if (! self::canDeleteMessage($thread, $actor, $message)) {
             throw UnauthorizedMessagingAction::for($actor, 'delete this message');
+        }
+    }
+
+    public static function authorizeEditMessage(Message $message, Model $actor): void
+    {
+        if (! self::canEditMessage($message, $actor)) {
+            throw UnauthorizedMessagingAction::for($actor, 'edit this message');
         }
     }
 

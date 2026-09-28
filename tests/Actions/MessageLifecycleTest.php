@@ -9,12 +9,15 @@ use RoundlyConsulting\Messages\DataTransferObjects\EditMessageData;
 use RoundlyConsulting\Messages\Events\MessageDeleted;
 use RoundlyConsulting\Messages\Events\MessageEdited;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
+use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
+use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 beforeEach(function () {
     $this->thread = messaging()->threads()->create(name: 'Chat');
-    $this->message = messaging()->messages()->sendMessage($this->thread, User::create(), 'first');
+    $this->author = User::create();
+    $this->message = messaging()->messages()->sendMessage($this->thread, $this->author, 'first');
 });
 
 it('edits a message and dispatches MessageEdited', function () {
@@ -48,3 +51,21 @@ it('throws when deleting an already deleted message', function () {
 
     app(DeleteMessage::class)->execute($this->message);
 })->throws(MessageException::class);
+
+it('lets the author edit their own message', function () {
+    $updated = app(EditMessage::class)->execute(new EditMessageData($this->message, 'mine', $this->author));
+
+    expect($updated->message)->toBe('mine');
+});
+
+it('refuses an edit by anyone but the author, even with roles switched off', function () {
+    config()->set('messages.permissions.enabled', false);
+
+    app(EditMessage::class)->execute(new EditMessageData($this->message, 'hijacked', User::create()));
+})->throws(UnauthorizedMessagingAction::class);
+
+it('refuses an actor edit of a system message, which has no author', function () {
+    $system = Messages::send($this->thread, null, 'system note');
+
+    app(EditMessage::class)->execute(new EditMessageData($system, 'nope', $this->author));
+})->throws(UnauthorizedMessagingAction::class);
