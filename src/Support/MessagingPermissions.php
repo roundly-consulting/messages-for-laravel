@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 
 /**
@@ -41,6 +42,24 @@ final class MessagingPermissions
         }
 
         return ! self::enforces($thread) || $participation->role?->canManage() === true;
+    }
+
+    /**
+     * Removing someone else takes manage rights and — with roles enforced — a role above the
+     * target's: the owner removes admins and members, an admin removes members only, so an
+     * admin can neither remove the owner nor a fellow admin.
+     */
+    public static function canRemove(Thread $thread, Model $actor, Participant $target): bool
+    {
+        if (! self::canManage($thread, $actor)) {
+            return false;
+        }
+
+        if (! self::enforces($thread)) {
+            return true;
+        }
+
+        return $thread->roleOf($actor)?->outranks($target->role ?? ParticipantRole::Member) === true;
     }
 
     /**
@@ -85,6 +104,13 @@ final class MessagingPermissions
     {
         if (! self::canManage($thread, $actor)) {
             throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Admin, $action);
+        }
+    }
+
+    public static function authorizeRemove(Thread $thread, Model $actor, Participant $target): void
+    {
+        if (! self::canRemove($thread, $actor, $target)) {
+            throw UnauthorizedMessagingAction::for($actor, 'remove this participant');
         }
     }
 

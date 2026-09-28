@@ -294,11 +294,15 @@ Group threads carry per-participant roles — **owner**, **admin**, **member**
 its owner; everyone added afterwards joins as a member. Owners and admins may add/remove
 participants, rename and archive the thread, and moderate anyone's messages; members may only
 manage their own messages. Changing roles is the **owner's** alone — an admin can add members
-but can neither promote anyone to admin nor demote a fellow admin.
+but can neither promote anyone to admin nor demote a fellow admin. Removing someone takes a role
+**above** theirs: the owner removes admins and members, an admin removes members only — never a
+fellow admin or the owner.
 
 **Ownership only moves through `transferOwnership()`.** `setRole()` never grants the owner role
-and never changes the owner's role, and `add()` never creates a second owner — for any caller,
-trusted ones included. Both throw a `ParticipationException`.
+and never changes the owner's role, `add()` never creates a second owner, and the owner cannot
+leave — or be removed — while anyone else is still in the thread; hand ownership over first (the
+last one out may simply leave). This holds for every caller, trusted ones included, and with roles
+switched off. Each refusal throws a `ParticipationException`.
 
 ```php
 use RoundlyConsulting\Messages\Enums\ParticipantRole;

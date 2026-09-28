@@ -7,6 +7,7 @@ return [
         'interface-required' => 'Missing implementation of the :interface interface for class :class.',
         'not-a-participant' => '[:participant] is not a participant of this thread.',
         'ownership-by-transfer' => 'Ownership changes hands only through transferOwnership().',
+        'owner-must-transfer' => 'The owner must transferOwnership() before leaving the thread.',
         'participant-missing' => 'The model behind participant [:participant] no longer exists.',
     ],
 

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Messages\DataTransferObjects\RemoveParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Enums\MessageType;
+use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ParticipantLeft;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
@@ -22,8 +23,10 @@ final class RemoveParticipant
 
     public function execute(RemoveParticipantData $data): void
     {
-        // Removing someone else requires manage rights; leaving (self) is always allowed.
-        if ($data->actor !== null && ! $this->isSelf($data)) {
+        // Removing someone else requires manage rights; leaving (self) needs no role.
+        $removesOther = $data->actor !== null && ! $this->isSelf($data);
+
+        if ($removesOther) {
             MessagingPermissions::authorizeManage($data->thread, $data->actor, 'remove participants');
         }
 
@@ -36,6 +39,14 @@ final class RemoveParticipant
             throw ParticipationException::notAParticipant($data->participant);
         }
 
+        // ...and, with roles enforced, a role above theirs: an admin removes members, never a
+        // fellow admin or the owner.
+        if ($removesOther) {
+            MessagingPermissions::authorizeRemove($data->thread, $data->actor, $participant);
+        }
+
+        $this->keepTheOwner($data, $participant);
+
         $participant->delete();
 
         $data->thread->touch('last_activity_at');
@@ -43,6 +54,28 @@ final class RemoveParticipant
         Event::dispatch(new ParticipantLeft($data->thread, $data->participant));
 
         $this->maybeSystemMessage($data);
+    }
+
+    /**
+     * A group thread never loses its owner while anyone else is still in it — not to a
+     * trusted caller, not by leaving, and not with roles switched off (the roles stay the
+     * thread's data, for the day they are switched on). Ownership only moves through
+     * {@see TransferOwnership}; the last one out may simply leave.
+     */
+    private function keepTheOwner(RemoveParticipantData $data, Participant $participant): void
+    {
+        if ($data->thread->is_direct || $participant->role !== ParticipantRole::Owner) {
+            return;
+        }
+
+        $othersRemain = $data->thread
+            ->participants()
+            ->whereKeyNot($participant->getKey())
+            ->exists();
+
+        if ($othersRemain) {
+            throw ParticipationException::ownerMustTransferFirst();
+        }
     }
 
     private function isSelf(RemoveParticipantData $data): bool
