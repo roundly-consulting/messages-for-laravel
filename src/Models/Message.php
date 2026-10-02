@@ -173,6 +173,9 @@ class Message extends Model implements HasMedia
      * Should the pointer message have been pruned since, `read_at` is the only position left
      * and is used instead; everything older than it is gone with it.
      *
+     * Messages in a deleted thread are left out: the thread is gone from the inbox and from
+     * `unreadThreads()`, so its messages must not hold the unread badge up either.
+     *
      * @param  Builder<Message>  $query
      * @return Builder<Message>
      */
@@ -182,6 +185,8 @@ class Message extends Model implements HasMedia
         $messages = $query->getModel()->getTable();
 
         return $query
+            // In a thread that still exists (not soft-deleted).
+            ->whereHas('thread')
             // Not authored by the participant.
             ->where(fn (Builder $q): Builder => $q
                 ->whereNull('sender_id')

@@ -546,7 +546,7 @@ reached when they last marked the thread read. A message is unread when it sorts
 message (by `created_at`, then by key) or they have never read anything, and they are not its
 sender. `read_at` only records *when* they read, so a reply that lands in the same second as the
 read still counts as unread. Should the pointer message be pruned later, `read_at` stands in
-for it.
+for it. Messages in a deleted thread never count — the global `unreadCount()` matches the inbox.
 
 ## Editing, unsending & system messages
 
