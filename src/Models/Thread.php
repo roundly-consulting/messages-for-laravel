@@ -29,6 +29,7 @@ use RoundlyConsulting\Messages\Support\ParticipantModel;
  * @property int|string $id
  * @property string|null $name
  * @property bool $is_direct
+ * @property string|null $direct_key
  * @property bool $is_public
  * @property bool $everyone_can_join
  * @property CarbonInterface $last_activity_at
@@ -136,6 +137,24 @@ class Thread extends Model
             ->whereHas('participants', fn (Builder $q): Builder => $q->whereMorphedTo('participant', $second))
             // Exactly the two of them — no third participant turns the DM into a group.
             ->has('participants', '=', $self ? 1 : 2);
+    }
+
+    /**
+     * The key a direct thread between the two models carries — the same whichever side comes
+     * first. Each side is `{length}:{morph type}:{key}`; the length prefix keeps the encoding
+     * unambiguous whatever characters a morph alias holds, and the sides are sorted so the
+     * pair has one spelling.
+     */
+    public static function directKeyFor(Model $first, Model $second): string
+    {
+        $sides = array_map(
+            static fn (Model $side): string => strlen($side->getMorphClass()).':'.$side->getMorphClass().':'.(string) $side->getKey(),
+            [$first, $second],
+        );
+
+        sort($sides);
+
+        return implode('|', $sides);
     }
 
     /**

@@ -35,6 +35,7 @@ final class StartThread
             'is_public' => $isPublic,
             'everyone_can_join' => $everyoneCanJoin,
             'is_direct' => $data->isDirect,
+            'direct_key' => $data->isDirect ? $data->directKey : null,
             'last_activity_at' => now(),
         ]);
 

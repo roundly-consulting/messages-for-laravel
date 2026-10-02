@@ -272,8 +272,11 @@ $bob->markThreadRead($thread);
 $bob->unreadCount();          // 0
 ```
 
-`conversationWith()` always returns the *same* direct thread for the same two participants, so
-you never end up with duplicate DMs. Direct threads are always private.
+`conversationWith()` (and `Messages::direct()`) always returns the *same* direct thread for the
+same two participants, so you never end up with duplicate DMs — not even when both sides make
+first contact at the same moment: the DM carries a unique pair key (`direct_key`), the database
+refuses the second insert, and the loser gets the winner's thread. A DM that was deleted, or that
+someone left, hands the key to the fresh one. Direct threads are always private.
 
 ## Group conversations
 
