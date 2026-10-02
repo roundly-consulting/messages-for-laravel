@@ -11,6 +11,7 @@ use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadCreated;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\ThreadModel;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 final class StartThread
 {
@@ -22,11 +23,11 @@ final class StartThread
     {
         $isPublic = $data->isDirect
             ? false
-            : ($data->isPublic ?? (bool) config('messages.publicity.public-by-default', false));
+            : ($data->isPublic ?? Config::boolean('messages.publicity.public-by-default'));
 
         $everyoneCanJoin = $data->isDirect
             ? false
-            : ($data->everyoneCanJoin ?? (bool) config('messages.publicity.everyone-can-join', false));
+            : ($data->everyoneCanJoin ?? Config::boolean('messages.publicity.everyone-can-join'));
 
         $model = ThreadModel::class();
 

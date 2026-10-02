@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use RoundlyConsulting\MediaLibrary\Jobs\GenerateVariantsJob;
 use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\Messages\Events\MessageSent;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * On MessageSent, (re)warm the message's image attachment variants so responsive previews are
@@ -18,7 +19,7 @@ final class WarmMessageMediaVariants implements ShouldQueue
 {
     public function handle(MessageSent $event): void
     {
-        if (! (bool) config('messages.media.warm_on_send', true)) {
+        if (! Config::boolean('messages.media.warm_on_send', true)) {
             return;
         }
 

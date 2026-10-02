@@ -10,6 +10,7 @@ use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Centralises authorization for actor-checked operations.
@@ -23,7 +24,7 @@ final class MessagingPermissions
 {
     public static function enabled(): bool
     {
-        return config('messages.permissions.enabled') === true;
+        return Config::boolean('messages.permissions.enabled', true);
     }
 
     /** Whether enforcement applies to this thread at all. */

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 final class PruneMessages
 {
@@ -52,7 +53,7 @@ final class PruneMessages
      */
     private function clearAttachments(Builder $query): void
     {
-        if (! (bool) config('messages.media.cleanup_on_force_delete', true)) {
+        if (! Config::boolean('messages.media.cleanup_on_force_delete', true)) {
             return;
         }
 

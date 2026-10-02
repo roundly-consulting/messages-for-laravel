@@ -15,6 +15,7 @@ use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Add a participant to a thread — find-or-add: someone who is already in the thread gets their
@@ -132,7 +133,7 @@ final class AddParticipant
 
     private function maybeSystemMessage(AddParticipantData $data): void
     {
-        if (config('messages.system-messages.enabled') !== true) {
+        if (! Config::boolean('messages.system-messages.enabled')) {
             return;
         }
 

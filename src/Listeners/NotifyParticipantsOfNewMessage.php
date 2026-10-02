@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Notification as NotificationFacade;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Opt-in bridge to Laravel notifications. When enabled, every sent message notifies the
@@ -19,7 +20,7 @@ final class NotifyParticipantsOfNewMessage
 {
     public function handle(MessageSent $event): void
     {
-        if (config('messages.notifications.enabled') !== true) {
+        if (! Config::boolean('messages.notifications.enabled')) {
             return;
         }
 

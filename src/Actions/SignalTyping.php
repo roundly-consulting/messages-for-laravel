@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Messages\Events\ParticipantTyping;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Broadcast a transient "is typing" signal. Nothing is persisted, and nothing is broadcast
@@ -26,7 +27,7 @@ final readonly class SignalTyping
             throw ParticipationException::notAParticipant($participant);
         }
 
-        if (config('messages.broadcasting.enabled') !== true) {
+        if (! Config::boolean('messages.broadcasting.enabled')) {
             return;
         }
 

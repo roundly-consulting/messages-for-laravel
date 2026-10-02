@@ -16,6 +16,7 @@ use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 final class MessagesServiceProvider extends PackageServiceProvider
 {
@@ -67,10 +68,10 @@ final class MessagesServiceProvider extends PackageServiceProvider
                 // to see it without reading a migration.
                 'Key type' => KeyType::fromConfig('messages.primary_key_type')->value,
                 'New threads' => self::publicity(),
-                'Roles' => config('messages.permissions.enabled') === true ? 'ENFORCED' : 'OFF',
-                'System messages' => config('messages.system-messages.enabled') === true ? 'ON' : 'OFF',
+                'Roles' => Config::boolean('messages.permissions.enabled', true) ? 'ENFORCED' : 'OFF',
+                'System messages' => Config::boolean('messages.system-messages.enabled') ? 'ON' : 'OFF',
                 'Notifications' => self::notifications(),
-                'Broadcasting' => config('messages.broadcasting.enabled') === true ? 'ON' : 'OFF',
+                'Broadcasting' => Config::boolean('messages.broadcasting.enabled') ? 'ON' : 'OFF',
                 'Preview length' => self::intValue('messages.preview.length', 120).' chars',
                 'Prune retention' => self::intValue('messages.prune.days', 90).' days',
                 'Attachments' => self::attachments(),
@@ -78,8 +79,8 @@ final class MessagesServiceProvider extends PackageServiceProvider
                 'Accepted types' => self::listSize('messages.media.accepted_mime_types', 'mime type', 'ANY'),
                 'Max attachment size' => self::bytes(),
                 'Responsive widths' => self::listSize('messages.media.responsive_widths', 'width', 'MEDIA DEFAULT'),
-                'Warm variants on send' => config('messages.media.warm_on_send') === true ? 'ON' : 'OFF',
-                'Attachment cleanup' => config('messages.media.cleanup_on_force_delete') === true
+                'Warm variants on send' => Config::boolean('messages.media.warm_on_send', true) ? 'ON' : 'OFF',
+                'Attachment cleanup' => Config::boolean('messages.media.cleanup_on_force_delete', true)
                     ? 'ON FORCE DELETE'
                     : 'OFF',
                 'Signed URL lifetime' => self::signedUrlLifetime(),
@@ -140,8 +141,8 @@ final class MessagesServiceProvider extends PackageServiceProvider
 
     private static function publicity(): string
     {
-        $public = config('messages.publicity.public-by-default') === true;
-        $open = config('messages.publicity.everyone-can-join') === true;
+        $public = Config::boolean('messages.publicity.public-by-default');
+        $open = Config::boolean('messages.publicity.everyone-can-join');
 
         return sprintf(
             '%s (%s)',
@@ -152,7 +153,7 @@ final class MessagesServiceProvider extends PackageServiceProvider
 
     private static function notifications(): string
     {
-        if (config('messages.notifications.enabled') !== true) {
+        if (! Config::boolean('messages.notifications.enabled')) {
             return 'OFF';
         }
 

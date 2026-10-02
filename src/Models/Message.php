@@ -28,6 +28,7 @@ use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * @property int|string $id
@@ -70,7 +71,7 @@ class Message extends Model implements HasMedia
         // deletes keep them. Bulk force-deletes (PruneMessages) skip model events, so the prune
         // action clears attachments in its own loop.
         static::forceDeleted(static function (Message $message): void {
-            if ((bool) config('messages.media.cleanup_on_force_delete', true)) {
+            if (Config::boolean('messages.media.cleanup_on_force_delete', true)) {
                 $message->clearMediaBucket($message->attachmentsBucket());
             }
         });
@@ -245,7 +246,7 @@ class Message extends Model implements HasMedia
      */
     public function broadcastOn($event): PrivateChannel|array
     {
-        if (config('messages.broadcasting.enabled') !== true) {
+        if (! Config::boolean('messages.broadcasting.enabled')) {
             return [];
         }
 

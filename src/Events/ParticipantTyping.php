@@ -13,6 +13,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * Transient "is typing" signal. Never persisted — it only broadcasts, and only when
@@ -31,7 +32,7 @@ final class ParticipantTyping implements ShouldBroadcast
     /** @return array<int, Channel> */
     public function broadcastOn(): array
     {
-        if (config('messages.broadcasting.enabled') !== true) {
+        if (! Config::boolean('messages.broadcasting.enabled')) {
             return [];
         }
 

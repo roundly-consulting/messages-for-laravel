@@ -11,6 +11,7 @@ use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Events\ThreadRenamed;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 final class RenameThread
 {
@@ -37,7 +38,7 @@ final class RenameThread
 
     private function maybeSystemMessage(Thread $thread, ?string $name): void
     {
-        if (config('messages.system-messages.enabled') !== true) {
+        if (! Config::boolean('messages.system-messages.enabled')) {
             return;
         }
 

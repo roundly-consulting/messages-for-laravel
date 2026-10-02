@@ -786,6 +786,10 @@ return [
 | `broadcasting.messages.channel` | string | `messaging.thread.{id}` | — | Private per-thread channel for messages. |
 | `broadcasting.messages.events.*` | string | `messaging.message.sent` / `updated` / `unsent` / `restored` | — | Event names for created / updated / trashed / restored / deleted. |
 
+Every `bool` switch is parsed as a boolean, so `.env` values mean what they say:
+`true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no` turn it off (`MESSAGES_PERMISSIONS=1`
+enforces roles, `THREADS_PUBLIC=off` keeps new threads private).
+
 ### Key types
 
 Two **independent** settings type the package's columns. Both are read when the migrations run,

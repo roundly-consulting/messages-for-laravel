@@ -14,6 +14,7 @@ use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 final class RemoveParticipant
 {
@@ -87,7 +88,7 @@ final class RemoveParticipant
 
     private function maybeSystemMessage(RemoveParticipantData $data): void
     {
-        if (config('messages.system-messages.enabled') !== true) {
+        if (! Config::boolean('messages.system-messages.enabled')) {
             return;
         }
 

@@ -21,6 +21,7 @@ use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Support\ThreadModel;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * @property int|string $id
@@ -174,7 +175,7 @@ class Participant extends Model
      */
     public function broadcastOn($event): PrivateChannel|array
     {
-        if (config('messages.broadcasting.enabled') !== true) {
+        if (! Config::boolean('messages.broadcasting.enabled')) {
             return [];
         }
 

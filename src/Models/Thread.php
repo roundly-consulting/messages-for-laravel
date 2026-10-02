@@ -24,6 +24,7 @@ use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
  * @property int|string $id
@@ -378,7 +379,7 @@ class Thread extends Model
      */
     public function broadcastOn($event): Channel|array
     {
-        if (config('messages.broadcasting.enabled') !== true || $event !== 'created') {
+        if (! Config::boolean('messages.broadcasting.enabled') || $event !== 'created') {
             return [];
         }
 
