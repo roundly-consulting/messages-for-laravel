@@ -44,6 +44,22 @@ final class ParticipationException extends Exception
         return new self(is_string($message) ? $message : 'The owner must transferOwnership() before leaving the thread.');
     }
 
+    public static function notTheOwner(Model $model): self
+    {
+        $message = trans('messages::messages.participation.not-the-owner', [
+            'participant' => "{$model->getMorphClass()}:{$model->getKey()}",
+        ]);
+
+        return new self(is_string($message) ? $message : 'Only the owner can transfer ownership.');
+    }
+
+    public static function directThreadHasNoRoles(): self
+    {
+        $message = trans('messages::messages.participation.direct-has-no-roles');
+
+        return new self(is_string($message) ? $message : 'A direct thread has no roles to change.');
+    }
+
     public static function inAnotherThread(Participant $participant): self
     {
         $message = trans('messages::messages.scope.participant-in-another-thread', [

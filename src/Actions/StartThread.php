@@ -68,9 +68,14 @@ final class StartThread
         return $thread;
     }
 
+    /**
+     * A group thread gets its owner and members whether or not roles are enforced: enforcement
+     * decides whether roles are checked, not whether they are kept, so switching it on later
+     * finds a thread its owner can still manage. Direct threads stay roleless.
+     */
     private function roleForIndex(CreateThreadData $data, int $index): ?ParticipantRole
     {
-        if ($data->isDirect || config('messages.permissions.enabled') !== true) {
+        if ($data->isDirect) {
             return null;
         }
 

@@ -109,7 +109,8 @@ return [
     'permissions' => [
         // Enforce participant roles (owner/admin/member) on group threads. Direct (1:1)
         // threads are always roleless and skip enforcement. Disable to keep every
-        // participant equally privileged.
+        // participant equally privileged — roles are still recorded, just not checked, so
+        // re-enabling finds every group thread with its owner.
         'enabled' => env('MESSAGES_PERMISSIONS', true),
     ],
 

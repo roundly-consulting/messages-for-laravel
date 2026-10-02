@@ -311,11 +311,12 @@ but can neither promote anyone to admin nor demote a fellow admin. Removing some
 **above** theirs: the owner removes admins and members, an admin removes members only — never a
 fellow admin or the owner.
 
-**Ownership only moves through `transferOwnership()`.** `setRole()` never grants the owner role
-and never changes the owner's role, `add()` never creates a second owner, and the owner cannot
-leave — or be removed — while anyone else is still in the thread; hand ownership over first (the
-last one out may simply leave). This holds for every caller, trusted ones included, and with roles
-switched off. Each refusal throws a `ParticipationException`.
+**Ownership only moves through `transferOwnership()`, and only from the owner.** `setRole()` never
+grants the owner role and never changes the owner's role, `add()` never creates a second owner,
+`transferOwnership(from: …)` refuses a `from` who is not the owner, and the owner cannot leave — or
+be removed — while anyone else is still in the thread; hand ownership over first (the last one out
+may simply leave). This holds for every caller, trusted ones included, and with roles switched
+off. Each refusal throws a `ParticipationException`.
 
 ```php
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
@@ -332,7 +333,10 @@ $participants->transferOwnership(from: $alice, to: $bob); // $alice is demoted t
 
 Role enforcement is opt-out via `messages.permissions.enabled` (default `true`) and is **skipped
 for direct threads**, which are always roleless: there, and with roles off, every participant is
-a peer who may manage the thread. **An actor must always be a participant**, though — whatever the
+a peer who may manage the thread. Switching enforcement off stops roles being *checked*, not being
+*kept*: a group thread still gets its owner and members, so turning enforcement on later finds
+every thread ranked and manageable by its owner. A direct thread has no roles at all — `setRole()`
+and `transferOwnership()` on one throw a `ParticipationException`. **An actor must always be a participant**, though — whatever the
 config and thread type, someone who is not in the thread (or has left it) cannot send, rename,
 archive, manage participants, or edit or delete messages in it, including their own. When an actor
 is refused the action throws a typed `RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction`.

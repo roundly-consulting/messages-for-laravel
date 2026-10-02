@@ -117,16 +117,14 @@ final class AddParticipant
     }
 
     /**
-     * Group threads always carry a role (defaulting to Member); direct threads stay roleless.
+     * Group threads always carry a role (defaulting to Member) — with roles enforced or not, so
+     * switching enforcement on later finds every participant ranked; direct threads stay
+     * roleless.
      */
     private function resolveRole(AddParticipantData $data): ?ParticipantRole
     {
         if ($data->thread->is_direct) {
             return null;
-        }
-
-        if (config('messages.permissions.enabled') !== true) {
-            return $data->role;
         }
 
         return $data->role ?? ParticipantRole::Member;

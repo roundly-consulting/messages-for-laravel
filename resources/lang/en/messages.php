@@ -8,6 +8,8 @@ return [
         'not-a-participant' => '[:participant] is not a participant of this thread.',
         'ownership-by-transfer' => 'Ownership changes hands only through transferOwnership().',
         'owner-must-transfer' => 'The owner must transferOwnership() before leaving the thread.',
+        'not-the-owner' => '[:participant] does not own this thread, so has no ownership to transfer.',
+        'direct-has-no-roles' => 'A direct thread has no roles to change.',
         'participant-missing' => 'The model behind participant [:participant] no longer exists.',
     ],
 

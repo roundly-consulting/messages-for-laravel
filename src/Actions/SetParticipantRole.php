@@ -15,7 +15,8 @@ use RoundlyConsulting\Messages\Support\MessagingPermissions;
  *
  * Ownership never moves here — not granted, not taken away, whoever asks: it changes hands only
  * through {@see TransferOwnership}. With roles enforced, only the owner may change roles, so an
- * admin can neither promote a member nor demote a fellow admin.
+ * admin can neither promote a member nor demote a fellow admin. A direct thread has no roles to
+ * change.
  */
 final class SetParticipantRole
 {
@@ -27,6 +28,10 @@ final class SetParticipantRole
 
         if ($data->actor !== null) {
             MessagingPermissions::authorizeSetRole($data->thread, $data->actor);
+        }
+
+        if ($data->thread->is_direct) {
+            throw ParticipationException::directThreadHasNoRoles();
         }
 
         $participant = $data->thread
