@@ -21,8 +21,8 @@
 
 A direct-message and group-chat foundation for any Laravel app. Give any Eloquent model a
 one-line messaging API, track read receipts and unread counts, react to plain Laravel events,
-and (optionally) broadcast every change in real time — all built only on Laravel/Symfony, with
-no third-party runtime dependencies.
+and (optionally) broadcast new threads, messages, read receipts and typing in real time — all
+built only on Laravel/Symfony, with no third-party runtime dependencies.
 
 ## Requirements
 
@@ -35,15 +35,29 @@ no third-party runtime dependencies.
 composer require roundly-consulting/messages-for-laravel
 ```
 
-Migrations are **not loaded automatically** — publish them first, then migrate:
+If your participating models (usually `User`) are keyed by uuid or ulid, set that **before**
+you migrate — see [Key types](#key-types):
+
+```dotenv
+MESSAGES_KEY_TYPE=uuid   # bigint (default) | uuid | ulid — your models' primary key type
+```
+
+Migrations are **not loaded automatically** — publish them first, then migrate. Messages
+stores attachments through [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel),
+installed with it, whose `media` table is publish-only too — publish both:
 
 ```bash
+php artisan vendor:publish --tag="media-migrations"
 php artisan vendor:publish --tag="messages-migrations"
 php artisan migrate
 ```
 
-They land in your `database/migrations` under timestamped filenames that preserve the order
-the tables depend on each other in, so they interleave correctly with your own migrations.
+Skip `media-migrations` and the first send fails with `no such table: media`: every send looks
+up the message's attachments, whether or not it has any.
+
+The messages migrations land in your `database/migrations` under timestamped filenames that
+preserve the order the tables depend on each other in, so they interleave correctly with your
+own migrations.
 
 Optionally publish the config or translations:
 
@@ -122,16 +136,17 @@ Messages::thread($thread)->markRead($bob);
 Messages::thread($thread)->typing($bob);      // broadcast-only, see Broadcasting
 Messages::thread($thread)->messages(perPage: 25);   // newest first, senders eager loaded
 
+// One message
+$message = Messages::send($thread, $alice, 'Helo');
+Messages::message($message)->edit('Hello', by: $alice);   // author only
+Messages::message($message)->delete(by: $alice);          // author, or a manager
+
 // Its participants
 Messages::thread($thread)->participants()->add($carol, ParticipantRole::Admin, by: $alice);
 Messages::thread($thread)->participants()->setRole($carol, ParticipantRole::Member, by: $alice);
-Messages::thread($thread)->participants()->remove($carol, by: $alice);
-Messages::thread($thread)->participants()->leave($bob);
-Messages::thread($thread)->participants()->transferOwnership(from: $alice, to: $bob);
-
-// One message
-Messages::message($message)->edit('fixed typo', by: $alice);   // author only
-Messages::message($message)->delete(by: $alice);               // author, or a manager
+Messages::thread($thread)->participants()->transferOwnership(from: $alice, to: $bob); // $alice → admin
+Messages::thread($thread)->participants()->remove($carol, by: $bob);
+Messages::thread($thread)->participants()->leave($alice);   // the owner hands over before leaving
 
 // Housekeeping
 Messages::prune(days: 30);                    // defaults to messages.prune.days
@@ -281,13 +296,17 @@ someone left, hands the key to the fresh one. Direct threads are always private.
 ## Group conversations
 
 ```php
+use RoundlyConsulting\Messages\Facades\Messages;
+
 $thread = $alice->startConversationWith([$bob, $carol], name: 'Project X');
 $alice->sendMessageTo($thread, 'Welcome everyone');
 
 $alice->threads();        // every thread $alice is in, newest activity first
 $alice->conversations();  // alias of threads() with a chat-inbox name
 $alice->unreadThreads();  // only threads with unread messages
-$dave->joinThread($thread);  // only when the thread is open to everyone
+
+$lobby = Messages::start('Lobby')->public()->everyoneCanJoin()->withParticipants([$alice])->create();
+$dave->joinThread($lobby);  // a self-join — only on a thread open to everyone
 ```
 
 `joinThread()` is a self-join: it is allowed only on a thread created with `->everyoneCanJoin()`
@@ -362,15 +381,16 @@ their domain methods (`canManage()`, `outranks()`, …):
 ```php
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 
-ParticipantRole::labels();          // ['Owner', 'Admin', 'Member']
-ParticipantRole::toOptions();       // ['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member']
+ParticipantRole::labels();          // Collection ['Owner', 'Admin', 'Member']
+ParticipantRole::toOptions();       // Collection ['owner' => 'Owner', 'admin' => 'Admin', 'member' => 'Member']
 ParticipantRole::options();         // Collection<EnumOption{ value, label, name }> for JS/Inertia selects
 ParticipantRole::validationRule();  // 'in:owner,admin,member'
 ParticipantRole::Owner->label();    // 'Owner'
 ```
 
-enums-for-laravel is a hard dependency (Tier 0), so the helpers are always available — there is
-nothing to install or configure separately. See [`docs/cross-package-integration-plan.md`](https://github.com/roundly-consulting/docs) for the tier DAG.
+The three list helpers return `Illuminate\Support\Collection`s — call `->all()` for a plain
+array. enums-for-laravel is a hard dependency, so the helpers are always available — there is
+nothing to install or configure separately.
 
 ## Replies & quoting
 
@@ -392,8 +412,6 @@ Replying to a message in a different thread throws a `MessageException`.
 ## Attachments
 
 > Integrates with [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel).
-> See the org-wide [cross-package integration plan](https://github.com/roundly-consulting) for how
-> the packages compose.
 
 Messages carry first-class file attachments backed by media-library. Each message owns a private
 `attachments` bucket: images get a responsive width ladder, any other file type (PDF, zip, …) is
@@ -403,13 +421,13 @@ To keep the signed URL the only way in, private attachments (and their variants)
 `messages.media.private_disk` — Laravel's non-public `local` disk by default — never on
 media-library's default `public` disk, which `php artisan storage:link` serves under `/storage`.
 
-media-library is a hard dependency, so there is nothing to opt into; install it alongside messages
-and configure a disk:
+media-library is a hard dependency, installed with messages, so there is nothing to opt into —
+publish its migration (as in [Installation](#installation)) and, optionally, its config:
 
 ```bash
-composer require roundly-consulting/messages-for-laravel
-php artisan vendor:publish --tag="media-config"   # set the attachments disk + streaming route
-php artisan migrate                               # creates the `media` table
+php artisan vendor:publish --tag="media-migrations"   # the `media` table attachments live in
+php artisan vendor:publish --tag="media-config"       # optional: default disk, streaming route
+php artisan migrate                                   # creates the `media` table
 ```
 
 ### Sending with attachments
@@ -454,7 +472,10 @@ $message->attachmentDownloadUrl($media);          // forces a download (attachme
 $message->attachmentPreviewUrl($media, 'responsive-640'); // a variant preview (images only)
 ```
 
-`attachmentPreviewUrl()` throws a `MessageException` for a non-image attachment. Responsive
+`attachmentPreviewUrl()` throws a `MessageException` for a non-image attachment. A named variant
+must have been generated — `responsive-640` exists only once the image is at least 640px wide and
+its variants have run (on send, see below); otherwise media-library throws an `InvalidVariant`,
+unless `media.url_fallback_to_original` is on, in which case you get the original. Responsive
 `srcset()` over private media needs a signed URL per candidate width, so use it only when the
 bucket is configured public.
 
@@ -465,7 +486,7 @@ When a message is sent, a queued `WarmMessageMediaVariants` listener dispatches 
 Force-deleting a message (hard delete / prune) removes its attachment files; soft-deleting
 (unsending) a message keeps them.
 
-### Configuration
+### Attachment configuration
 
 ```php
 // config/messages.php
@@ -645,6 +666,9 @@ Publish them into your app to customise (`vendor:publish --tag=messages-resource
 
 ## Configuration
 
+Publish `config/messages.php` (`vendor:publish --tag="messages-config"`) to change anything —
+every key has a default, so the package works with none of it:
+
 ```php
 return [
     'models' => [
@@ -653,12 +677,15 @@ return [
         'participant' => RoundlyConsulting\Messages\Models\Participant::class,
     ],
 
-    'primary_key_type' => env('MESSAGES_PRIMARY_KEY_TYPE', 'bigint'),
+    'key_type' => env('MESSAGES_KEY_TYPE', 'bigint'),                 // your participants' keys
+    'primary_key_type' => env('MESSAGES_PRIMARY_KEY_TYPE', 'bigint'), // the package's own ids
 
     'publicity' => [
         'public-by-default' => env('THREADS_PUBLIC', false),
         'everyone-can-join' => env('THREADS_EVERYONE_CAN_JOIN', false),
     ],
+
+    'media' => [ /* attachments — see Attachment configuration */ ],
 
     'system-messages' => [
         'enabled' => env('MESSAGES_SYSTEM_MESSAGES', false),
@@ -684,58 +711,99 @@ return [
 
     'broadcasting' => [
         'enabled' => env('REALTIME_MESSAGES', false),
-        // channels + event names for threads, participants and messages
+        'threads' => [
+            'public-channel' => 'messaging',
+            'per-participant-channel' => 'messaging.participant.{name}.{id}',
+            'events' => ['created' => 'messaging.thread.created'],
+        ],
+        'participants' => [
+            'channel' => 'messaging.thread.{id}',
+            'events' => [
+                'created' => 'messaging.participant.joined',
+                'updated' => 'messaging.participant.read',
+                'trashed' => 'messaging.participant.left',
+                'restored' => 'messaging.participant.joined',
+                'deleted' => 'messaging.participant.left',
+            ],
+        ],
+        'typing' => ['event' => 'messaging.participant.typing'],
+        'messages' => [
+            'channel' => 'messaging.thread.{id}',
+            'events' => [
+                'created' => 'messaging.message.sent',
+                'updated' => 'messaging.message.updated',
+                'trashed' => 'messaging.message.unsent',
+                'restored' => 'messaging.message.restored',
+                'deleted' => 'messaging.message.unsent',
+            ],
+        ],
     ],
 ];
 ```
 
-| Key | Type | Default | Backed by |
-|---|---|---|---|
-| `models.message` / `models.thread` / `models.participant` | class-string | the package models | — |
-| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `MESSAGES_PRIMARY_KEY_TYPE` | The key type of the package's own tables and every internal foreign key. Fixed at first migrate. See [Key types](#key-types). |
-| `publicity.public-by-default` | bool | `false` | `THREADS_PUBLIC` |
-| `publicity.everyone-can-join` | bool | `false` | `THREADS_EVERYONE_CAN_JOIN` |
-| `system-messages.enabled` | bool | `false` | `MESSAGES_SYSTEM_MESSAGES` |
-| `permissions.enabled` | bool | `true` | `MESSAGES_PERMISSIONS` |
-| `notifications.enabled` | bool | `false` | `MESSAGES_NOTIFICATIONS` |
-| `notifications.notification` | class-string | `NewMessageNotification` | — |
-| `notifications.channels` | list | `['database']` | — |
-| `preview.length` | int | `120` | `MESSAGES_PREVIEW_LENGTH` |
-| `prune.days` | int | `90` | `MESSAGES_PRUNE_DAYS` |
-| `broadcasting.enabled` | bool | `false` | `REALTIME_MESSAGES` |
-| `broadcasting.*.channel` / `*.events.*` | string | see config | — |
-
-Swap any `models.*` entry for your own subclass to extend behaviour.
+| Key | Type | Default | Env | What it does |
+|---|---|---|---|---|
+| `models.message` / `models.thread` / `models.participant` | class-string | the package models | — | Swap in your own subclass to extend behaviour. |
+| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `MESSAGES_KEY_TYPE` | Column type of `sender_id` / `participant_id` — must match your participating models' primary key. Fixed at first migrate. See [Key types](#key-types). |
+| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `MESSAGES_PRIMARY_KEY_TYPE` | Key type of the package's own tables and every internal foreign key. Fixed at first migrate. See [Key types](#key-types). |
+| `publicity.public-by-default` | bool | `false` | `THREADS_PUBLIC` | Visibility of a new group thread that does not pick one. |
+| `publicity.everyone-can-join` | bool | `false` | `THREADS_EVERYONE_CAN_JOIN` | Whether a new group thread lets anyone join it. |
+| `media.*` | — | see [Attachment configuration](#attachment-configuration) | `MESSAGES_MEDIA_*` | Attachments bucket, disks, visibility, size/type limits, variants, cleanup. |
+| `system-messages.enabled` | bool | `false` | `MESSAGES_SYSTEM_MESSAGES` | Write "joined / left / renamed" system messages. |
+| `permissions.enabled` | bool | `true` | `MESSAGES_PERMISSIONS` | Enforce roles on group threads (roles are kept either way). |
+| `notifications.enabled` | bool | `false` | `MESSAGES_NOTIFICATIONS` | Notify the other participants of a new message. |
+| `notifications.notification` | class-string | `NewMessageNotification` | — | The notification sent. |
+| `notifications.channels` | list | `['database']` | — | Channels the default notification uses. |
+| `preview.length` | int | `120` | `MESSAGES_PREVIEW_LENGTH` | Length of previews and quote excerpts. |
+| `prune.days` | int | `90` | `MESSAGES_PRUNE_DAYS` | Default retention for `messages:prune`. |
+| `broadcasting.enabled` | bool | `false` | `REALTIME_MESSAGES` | Broadcast over Laravel broadcasting — see [Broadcasting](#broadcasting). |
+| `broadcasting.threads.public-channel` | string | `messaging` | — | Channel a new public thread is announced on. |
+| `broadcasting.threads.per-participant-channel` | string | `messaging.participant.{name}.{id}` | — | Private channel a new private thread is announced on, once per participant. |
+| `broadcasting.threads.events.created` | string | `messaging.thread.created` | — | Event name of a new thread. |
+| `broadcasting.participants.channel` | string | `messaging.thread.{id}` | — | Private per-thread channel for participant changes. |
+| `broadcasting.participants.events.*` | string | `messaging.participant.joined` / `read` / `left` | — | Event names for created / updated / trashed / restored / deleted. |
+| `broadcasting.typing.event` | string | `messaging.participant.typing` | — | Event name of the typing signal. |
+| `broadcasting.messages.channel` | string | `messaging.thread.{id}` | — | Private per-thread channel for messages. |
+| `broadcasting.messages.events.*` | string | `messaging.message.sent` / `updated` / `unsent` / `restored` | — | Event names for created / updated / trashed / restored / deleted. |
 
 ### Key types
 
-`primary_key_type` sets the key type of the package's own tables — `messaging_threads`,
-`messaging_messages`, `messaging_participants` — **and every internal foreign key between
-them** (`thread_id`, `parent_message_id`, `last_read_message_id`). It is read when the
-migrations run, so choose it **before** you publish and migrate; changing it afterwards is a
-data migration, not a config change.
+Two **independent** settings type the package's columns. Both are read when the migrations run,
+so choose them **before** you publish and migrate; changing either afterwards is a data
+migration, not a config change.
+
+| Setting | Env | Types | Set it to |
+|---|---|---|---|
+| `key_type` | `MESSAGES_KEY_TYPE` | the morph keys pointing **at your models**: `messaging_messages.sender_id`, `messaging_participants.participant_id` | your participating models' primary key type |
+| `primary_key_type` | `MESSAGES_PRIMARY_KEY_TYPE` | the package's **own** ids — `messaging_threads`, `messaging_messages`, `messaging_participants` — and every internal foreign key between them (`thread_id`, `parent_message_id`, `last_read_message_id`) | `bigint`, unless every morph target in your app is uuid/ulid (below) |
+
+A bigint-keyed messaging install with uuid users is an ordinary application:
 
 ```dotenv
-MESSAGES_PRIMARY_KEY_TYPE=uuid   # bigint (default) | uuid | ulid
+MESSAGES_KEY_TYPE=uuid             # User uses HasUuids
+# MESSAGES_PRIMARY_KEY_TYPE stays bigint
 ```
 
-**Why it defaults to `bigint`.** A thread or a message is a thing other packages point *at*
-polymorphically, and a Laravel morph column (`$table->morphs('subject')`) is an unsigned
-bigint. On a strict engine such as PostgreSQL, a `uuid` id will not go into one:
+**`key_type` must match your models.** Leave it at `bigint` with uuid users and PostgreSQL
+rejects the very first conversation:
 
 ```
-SQLSTATE[22P02]: invalid input syntax for type bigint: "019f6f33-22b8-737f-a581-849e7cdc517a"
+SQLSTATE[22P02]: invalid input syntax for type bigint: "01a0fc2b-4518-722a-8e92-50589b45ba2a"
 ```
 
-SQLite will **not** warn you about this — its type affinity stores the string in an integer
-column silently, so a green SQLite suite proves nothing here.
+Every model that sends or participates shares those two columns, so they must all use that one
+key type — a bigint `User` and a uuid `Company` cannot both take part.
 
-> **Constraint:** this assumes every morph target in your application shares one key type. If
-> you set `MESSAGES_PRIMARY_KEY_TYPE=uuid`, the models on the other end of your polymorphic
-> relations need to be uuid-keyed too, and the packages owning those columns need to agree. A
-> mixed application — a `uuid` `Thread` and a `bigint` `Post` pointed at by the same morph
-> column — is not supported by this package, by Laravel's own `morphs()`/`uuidMorphs()` split,
-> or by anything else. Pick one key type per application.
+**Why `primary_key_type` defaults to `bigint`.** A thread or a message is a thing other packages
+point *at* polymorphically, and a Laravel morph column (`$table->morphs('subject')`) is an
+unsigned bigint. On a strict engine such as PostgreSQL, a `uuid` id will not go into one — the
+same error as above. So set `MESSAGES_PRIMARY_KEY_TYPE=uuid` (or `ulid`) only if every model those
+host morph columns point at — threads, messages, and your own models alike — shares that key
+type; a `uuid` `Thread` and a `bigint` `Post` behind one `likeable_id` column is not supported, by
+this package or by Laravel's own `morphs()`/`uuidMorphs()` split.
+
+SQLite will **not** warn you about either mismatch — its type affinity stores the string in an
+integer column silently, so a green SQLite suite proves nothing here.
 
 ## Broadcasting
 
@@ -746,16 +814,28 @@ to push changes live over Laravel broadcasting (Reverb, Pusher, Ably, …):
 REALTIME_MESSAGES=true
 ```
 
-When enabled, the models use Laravel's `BroadcastsEvents` on create/update/delete/restore.
-Channel and event names are fully configurable.
+When enabled, these broadcast (channel and event names are the config defaults; every one is
+configurable):
 
-- `messaging` — public thread channel.
-- `messaging.participant.{name}.{id}` — private per-participant channel for private threads.
-- `messaging.thread.{id}` — per-thread channel for participant and message events.
+| What | Channel | Event |
+|---|---|---|
+| A new **public** thread | `messaging` (public) | `messaging.thread.created` |
+| A new **private or direct** thread | `messaging.participant.{name}.{id}` (private), once per participant | `messaging.thread.created` |
+| A participant joins / reads / leaves | `messaging.thread.{id}` (private) | `messaging.participant.joined` / `.read` / `.left` |
+| A message is sent / edited / unsent / restored | `messaging.thread.{id}` (private) | `messaging.message.sent` / `.updated` / `.unsent` / `.restored` |
+| Someone is typing | `messaging.thread.{id}` (private) | `messaging.participant.typing` |
+
+A new thread is announced once its participants are in, so a private thread reaches every one of
+them. `{name}` is the participant's lowercased class basename (`user`), `{id}` its key.
+
+A thread broadcasts **only its creation**: renaming, archiving or deleting one is not broadcast.
+React to the `ThreadRenamed` / `ThreadArchived` events to push those yourself — or enable system
+messages, which posts a (broadcast) "renamed" message into the thread.
 
 Broadcast a live typing indicator with `Messages::thread($thread)->typing($user)` (or
-`$thread->typing($user)`) — it only broadcasts (never persists) and respects
-`broadcasting.enabled`.
+`$thread->typing($user)`) — it only broadcasts (never persists), respects
+`broadcasting.enabled`, and refuses anyone who is not a current participant with a
+`ParticipationException`.
 
 ## Pruning old messages
 
