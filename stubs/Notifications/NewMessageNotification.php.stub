@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RoundlyConsulting\Messages\Notifications;
+namespace App\Notifications\Messages;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,12 +10,14 @@ use Illuminate\Notifications\Notification;
 use RoundlyConsulting\Messages\Models\Message;
 
 /**
- * Sent to a thread's other participants when a new message arrives. To customise channels and
- * content, point `messages.notifications.notification` at your own class — or publish an editable
- * copy in `App\Notifications\Messages` (`vendor:publish --tag=messages-notifications`) and point
- * the config at that.
+ * Your copy of the new-message notification, published by
+ * `vendor:publish --tag=messages-notifications`. It starts out behaving exactly like the
+ * package's own NewMessageNotification; it is yours to edit. Point the package at it in
+ * config/messages.php:
  *
- * Channels are host-configurable via {@see config()} so the package never forces mail.
+ *     'notifications' => [
+ *         'notification' => App\Notifications\Messages\NewMessageNotification::class,
+ *     ],
  */
 class NewMessageNotification extends Notification implements ShouldQueue
 {

@@ -60,10 +60,14 @@ it('keeps every publish tag byte-identical', function (): void {
     expect(array_values($translations))->toBe([app()->langPath('vendor/messages')]);
 
     $resources = ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-resources');
-    expect(array_values($resources))->toBe([app_path('Http/Resources/Messages')]);
+    expect(array_values($resources))->toBe([
+        app_path('Http/Resources/Messages/ThreadResource.php'),
+        app_path('Http/Resources/Messages/MessageResource.php'),
+        app_path('Http/Resources/Messages/ParticipantResource.php'),
+    ]);
 
     $notifications = ServiceProvider::pathsToPublish(MessagesServiceProvider::class, 'messages-notifications');
-    expect(array_values($notifications))->toBe([app_path('Notifications/Messages')]);
+    expect(array_values($notifications))->toBe([app_path('Notifications/Messages/NewMessageNotification.php')]);
 });
 
 it('contributes a messages section to about', function (): void {

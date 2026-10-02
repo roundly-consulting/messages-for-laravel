@@ -31,14 +31,26 @@ final class MessagesServiceProvider extends PackageServiceProvider
             ->hasCommands([
                 PruneMessagesCommand::class,
             ])
+            // Host-owned copies in the app namespace — never the package's own classes, which
+            // under app/ would break PSR-4 and never load, so edits to them changed nothing.
             ->publishesStubs(
-                __DIR__.'/Http/Resources',
-                app_path('Http/Resources/Messages'),
+                __DIR__.'/../stubs/Http/Resources/ThreadResource.php.stub',
+                app_path('Http/Resources/Messages/ThreadResource.php'),
                 'messages-resources',
             )
             ->publishesStubs(
-                __DIR__.'/Notifications',
-                app_path('Notifications/Messages'),
+                __DIR__.'/../stubs/Http/Resources/MessageResource.php.stub',
+                app_path('Http/Resources/Messages/MessageResource.php'),
+                'messages-resources',
+            )
+            ->publishesStubs(
+                __DIR__.'/../stubs/Http/Resources/ParticipantResource.php.stub',
+                app_path('Http/Resources/Messages/ParticipantResource.php'),
+                'messages-resources',
+            )
+            ->publishesStubs(
+                __DIR__.'/../stubs/Notifications/NewMessageNotification.php.stub',
+                app_path('Notifications/Messages/NewMessageNotification.php'),
                 'messages-notifications',
             )
             // This package carries private conversations. The section reports the

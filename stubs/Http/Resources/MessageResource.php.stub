@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Messages;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use RoundlyConsulting\Messages\Enums\MessageType;
+use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
+use RoundlyConsulting\Messages\Models\Message;
+
+/**
+ * Your copy of the message JSON shape, published by `vendor:publish --tag=messages-resources`.
+ * It starts out rendering exactly what the package's own MessageResource renders; it is yours to
+ * edit. Use this class (not the package one) in your controllers.
+ *
+ * @mixin Message
+ */
+class MessageResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $sender = $this->whenLoaded('sender');
+        $meta = $this->meta ?? [];
+
+        return [
+            'id' => $this->id,
+            'thread_id' => $this->thread_id,
+            'type' => $this->type->value,
+            'body' => $this->deleted_at !== null ? null : $this->message,
+            'preview' => $this->preview(),
+            'is_deleted' => $this->deleted_at !== null,
+            'sender' => $sender instanceof ParticipatesInMessaging
+                ? $sender->participateAs()
+                : $this->when(
+                    $this->resource->relationLoaded('sender'),
+                    fn (): ?array => null,
+                ),
+            'reply_to' => $this->replyInfo($meta),
+            'sent_at' => $this->created_at->toIso8601String(),
+            'edited_at' => $this->editedAt(),
+        ];
+    }
+
+    private function editedAt(): ?string
+    {
+        $updated = $this->updated_at;
+
+        if ($this->type !== MessageType::Text || $updated === null || $updated->equalTo($this->created_at)) {
+            return null;
+        }
+
+        return $updated->toIso8601String();
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>|null
+     */
+    private function replyInfo(array $meta): ?array
+    {
+        if ($this->parent_message_id === null) {
+            return null;
+        }
+
+        $quote = is_array($meta['quote'] ?? null) ? $meta['quote'] : [];
+
+        return [
+            'id' => $this->parent_message_id,
+            'excerpt' => $quote['excerpt'] ?? null,
+            'sender_id' => $quote['sender_id'] ?? null,
+            'sender_type' => $quote['sender_type'] ?? null,
+        ];
+    }
+}

@@ -526,8 +526,20 @@ MESSAGES_NOTIFICATIONS=true
 ],
 ```
 
-Point `notifications.notification` at your own class (or publish the default with
-`vendor:publish --tag=messages-notifications`) to customise channels and content.
+To customise channels and content, point `notifications.notification` at your own class — or
+publish an editable copy of the default and point the config at that:
+
+```bash
+php artisan vendor:publish --tag="messages-notifications"
+# → app/Notifications/Messages/NewMessageNotification.php (App\Notifications\Messages)
+```
+
+```php
+// config/messages.php
+'notifications' => [
+    'notification' => App\Notifications\Messages\NewMessageNotification::class,
+],
+```
 
 ## Inbox
 
@@ -662,7 +674,15 @@ return MessageResource::collection(Messages::thread($thread)->messages());
 Both paginators follow the request's `?page=`, so the envelope's `meta.current_page` and its
 `links.next` stay in step for an infinite-scroll client.
 
-Publish them into your app to customise (`vendor:publish --tag=messages-resources`).
+To customise them, publish editable copies — `ThreadResource`, `MessageResource` and
+`ParticipantResource` in `App\Http\Resources\Messages` (`app/Http/Resources/Messages`). They render
+exactly what the package's resources render until you edit them; use them instead of the package
+classes in your controllers. `ThreadResource` renders its latest message and participants through
+your copies too.
+
+```bash
+php artisan vendor:publish --tag="messages-resources"
+```
 
 ## Configuration
 
