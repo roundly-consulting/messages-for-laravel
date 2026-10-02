@@ -541,8 +541,12 @@ $participant->hasUnread();
 $participant->markAsRead();       // same as Messages::markRead() for that participant
 ```
 
-A message is unread for a participant when it was created after their last-read pointer (or
-they have never read the thread) and they are not its sender.
+Read state follows each participant's read pointer, `last_read_message_id` — the message they had
+reached when they last marked the thread read. A message is unread when it sorts after that
+message (by `created_at`, then by key) or they have never read anything, and they are not its
+sender. `read_at` only records *when* they read, so a reply that lands in the same second as the
+read still counts as unread. Should the pointer message be pruned later, `read_at` stands in
+for it.
 
 ## Editing, unsending & system messages
 
@@ -608,7 +612,8 @@ Thread::query()->direct();
 Thread::query()->forParticipant($user);
 Thread::query()->between($alice, $bob);
 Message::query()->unreadFor($user);
-Participant::query()->unread();
+Participant::query()->unread();            // never marked the thread read
+Participant::query()->readUpTo($message);  // read pointer at or past $message
 ```
 
 ## API resources

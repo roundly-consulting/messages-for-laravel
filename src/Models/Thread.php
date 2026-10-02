@@ -255,10 +255,7 @@ class Thread extends Model
      */
     public function seenBy(Message $message): Collection
     {
-        return $this->participants()
-            ->whereNotNull('read_at')
-            ->where('read_at', '>=', $message->created_at)
-            ->get();
+        return $this->participants()->readUpTo($message)->get();
     }
 
     public function unreadCountFor(Model $participant): int

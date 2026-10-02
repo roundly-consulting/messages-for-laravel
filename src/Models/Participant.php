@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Messages\Database\Factories\ParticipantFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
@@ -74,6 +75,36 @@ class Participant extends Model
     public function scopeUnread(Builder $query): Builder
     {
         return $query->whereNull('read_at');
+    }
+
+    /**
+     * Participants whose read pointer is at or past the given message — by `created_at`, then
+     * by key, the order "newest" means throughout the package. A pointer whose message has
+     * since been pruned falls back to the `read_at` stamp.
+     *
+     * @param  Builder<Participant>  $query
+     * @return Builder<Participant>
+     */
+    public function scopeReadUpTo(Builder $query, Message $message): Builder
+    {
+        $participants = $query->getModel()->getTable();
+        $messages = $message->getTable();
+        $pointer = static fn (QueryBuilder $sub): QueryBuilder => $sub
+            ->selectRaw('1')
+            ->from($messages.' as last_read')
+            ->whereColumn('last_read.id', $participants.'.last_read_message_id');
+
+        return $query->where(fn (Builder $read): Builder => $read
+            ->whereExists(fn (QueryBuilder $sub): QueryBuilder => $pointer($sub)
+                ->where(fn (QueryBuilder $order): QueryBuilder => $order
+                    ->where('last_read.created_at', '>', $message->created_at)
+                    ->orWhere(fn (QueryBuilder $tie): QueryBuilder => $tie
+                        ->where('last_read.created_at', '=', $message->created_at)
+                        ->where('last_read.id', '>=', $message->getKey()))))
+            ->orWhere(fn (Builder $pruned): Builder => $pruned
+                ->whereNotNull('last_read_message_id')
+                ->whereNotExists($pointer)
+                ->where('read_at', '>=', $message->created_at)));
     }
 
     /**

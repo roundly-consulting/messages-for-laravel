@@ -89,15 +89,9 @@ trait MaintainsThreadLatestMessage
      */
     public static function syncLatestMessageFor(int|string $threadId): int|string|null
     {
-        $message = MessageModel::class();
         $thread = ThreadModel::class();
 
-        /** @var int|string|null $latest */
-        $latest = $message::query()
-            ->where('thread_id', $threadId)
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->value('id');
+        $latest = self::newestMessageIdIn($threadId);
 
         // `toBase()` on purpose: this is bookkeeping, not a change to the thread. An Eloquent
         // update would stamp `updated_at` — making every send, unsend and restore look like an
@@ -111,6 +105,21 @@ trait MaintainsThreadLatestMessage
             ->update(['last_message_id' => $latest]);
 
         return $latest;
+    }
+
+    /**
+     * The key of the thread's newest surviving message — `created_at` desc, then `id` desc, the
+     * order "newest" means throughout the package — or null when it has none. Always asked of
+     * the database, never of a Thread instance, whose own pointer may predate the latest send.
+     */
+    public static function newestMessageIdIn(int|string $threadId): int|string|null
+    {
+        /** @var int|string|null */
+        return MessageModel::class()::query()
+            ->where('thread_id', $threadId)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->value('id');
     }
 
     /**

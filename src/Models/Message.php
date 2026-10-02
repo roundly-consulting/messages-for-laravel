@@ -122,8 +122,7 @@ class Message extends Model implements HasMedia
         return $participantModel::query()
             ->where('thread_id', $this->thread_id)
             ->whereMorphedTo('participant', $participant)
-            ->whereNotNull('read_at')
-            ->where('read_at', '>=', $this->created_at)
+            ->readUpTo($this)
             ->exists();
     }
 
@@ -165,15 +164,22 @@ class Message extends Model implements HasMedia
     /**
      * Messages in the participant's threads that they have not yet read.
      *
-     * A message is unread when it was created after the participant's last read
-     * pointer (or they have never read the thread) and they are not its sender.
+     * A message is unread when it sorts after the participant's read pointer
+     * (`last_read_message_id`) — by `created_at`, then by key, the order that defines "newest"
+     * everywhere in this package — or they have never read anything, and they are not its
+     * sender. The pointer, not the `read_at` stamp: timestamps have second precision, so a
+     * reply landing in the same second as the read would otherwise count as read.
+     *
+     * Should the pointer message have been pruned since, `read_at` is the only position left
+     * and is used instead; everything older than it is gone with it.
      *
      * @param  Builder<Message>  $query
      * @return Builder<Message>
      */
     public function scopeUnreadFor(Builder $query, Model $participant): Builder
     {
-        $table = ParticipantModel::new()->getTable();
+        $participants = ParticipantModel::new()->getTable();
+        $messages = $query->getModel()->getTable();
 
         return $query
             // Not authored by the participant.
@@ -181,17 +187,29 @@ class Message extends Model implements HasMedia
                 ->whereNull('sender_id')
                 ->orWhere('sender_id', '!=', $participant->getKey())
                 ->orWhere('sender_type', '!=', $participant->getMorphClass()))
-            // Newer than the participant's read pointer in this thread.
+            // Past the participant's read pointer in this thread.
             ->whereExists(fn (QueryBuilder $sub): QueryBuilder => $sub
                 ->selectRaw('1')
-                ->from($table)
-                ->whereColumn($table.'.thread_id', 'messaging_messages.thread_id')
-                ->where($table.'.participant_id', $participant->getKey())
-                ->where($table.'.participant_type', $participant->getMorphClass())
-                ->whereNull($table.'.deleted_at')
-                ->where(fn (QueryBuilder $pointer): QueryBuilder => $pointer
-                    ->whereNull($table.'.read_at')
-                    ->orWhereColumn($table.'.read_at', '<', 'messaging_messages.created_at')));
+                ->from($participants)
+                ->leftJoin($messages.' as last_read', 'last_read.id', '=', $participants.'.last_read_message_id')
+                ->whereColumn($participants.'.thread_id', $messages.'.thread_id')
+                ->where($participants.'.participant_id', $participant->getKey())
+                ->where($participants.'.participant_type', $participant->getMorphClass())
+                ->whereNull($participants.'.deleted_at')
+                ->where(fn (QueryBuilder $unread): QueryBuilder => $unread
+                    // Never read anything (a read of an empty thread included).
+                    ->whereNull($participants.'.last_read_message_id')
+                    // The pointer message was pruned: fall back to the stamp.
+                    ->orWhere(fn (QueryBuilder $pruned): QueryBuilder => $pruned
+                        ->whereNull('last_read.id')
+                        ->where(fn (QueryBuilder $stamp): QueryBuilder => $stamp
+                            ->whereNull($participants.'.read_at')
+                            ->orWhereColumn($participants.'.read_at', '<', $messages.'.created_at')))
+                    // Sorts after the pointer message.
+                    ->orWhereColumn('last_read.created_at', '<', $messages.'.created_at')
+                    ->orWhere(fn (QueryBuilder $tie): QueryBuilder => $tie
+                        ->whereColumn('last_read.created_at', '=', $messages.'.created_at')
+                        ->whereColumn('last_read.id', '<', $messages.'.id'))));
     }
 
     /**
