@@ -23,6 +23,7 @@ use RoundlyConsulting\Messages\Listeners\WarmMessageMediaVariants;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
 use RoundlyConsulting\Messages\Tests\Models\NotifiableUser;
 use RoundlyConsulting\Messages\Tests\Models\User;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 
 /**
  * Every switch is read as a boolean. The shipped config feeds most of them from env(), and
@@ -163,3 +164,25 @@ it('keeps attachments on force delete when cleanup is a falsy string', function 
     expect(Media::query()->whereKey($media->getKey())->exists())->toBeTrue()
         ->and(messagesAbout())->toMatch('/Attachment cleanup\s*\.*\s*OFF/');
 })->with('falsy strings');
+
+it('throws on a switch typo instead of reading it as the default (strict config)', function (string $key, Closure $read): void {
+    config()->set($key, 'disabled');
+
+    expect($read)->toThrow(
+        InvalidConfigurationException::class,
+        "Configuration value [{$key}] must be a boolean (true/false, 1/0, on/off or yes/no), [disabled] given.",
+    );
+})->with([
+    'publicity.public-by-default' => ['messages.publicity.public-by-default', fn () => app(StartThread::class)->execute(new CreateThreadData(name: 'Crew', participants: [User::create(), User::create()]))],
+    'permissions.enabled' => ['messages.permissions.enabled', fn (): string => messagesAbout()],
+    'system-messages.enabled' => ['messages.system-messages.enabled', fn (): string => messagesAbout()],
+    'broadcasting.enabled' => ['messages.broadcasting.enabled', fn (): string => messagesAbout()],
+    'media.warm_on_send' => ['messages.media.warm_on_send', fn (): string => messagesAbout()],
+]);
+
+it('throws on a key type typo instead of reading it as bigint (strict config)', function (): void {
+    config()->set('messages.primary_key_type', 'uiid');
+
+    expect(fn (): string => messagesAbout())
+        ->toThrow(InvalidConfigurationException::class, 'messages.primary_key_type');
+});
