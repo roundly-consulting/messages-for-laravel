@@ -506,8 +506,9 @@ Force-deleting a message (hard delete / prune) removes its attachment files; sof
 
 An explicit `disk` is used for every attachment whatever its visibility, so keep it non-public
 while attachments are private; `private_disk` can point at any non-public disk (e.g. private S3).
-A `visibility` typo, a blank or non-string bucket or disk name, or a junk size, width, lifetime
-or mime-type entry throws `InvalidConfigurationException` — it never falls back.
+A `visibility` typo, a non-string bucket or disk name, or a junk size, width, lifetime
+or mime-type entry throws `InvalidConfigurationException` — it never falls back. A blank value
+(`MESSAGES_MEDIA_DISK=`) is not set, so the default applies.
 
 ## Notifications
 
@@ -790,14 +791,16 @@ return [
 
 Every `bool` switch is parsed as a boolean, so `.env` values mean what they say:
 `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no` turn it off (`MESSAGES_PERMISSIONS=1`
-enforces roles, `THREADS_PUBLIC=off` keeps new threads private). Anything else throws
+enforces roles, `THREADS_PUBLIC=off` keeps new threads private). A blank value
+(`THREADS_PUBLIC=`) is not set, so the default applies. Anything else throws
 `InvalidConfigurationException` instead of quietly reading as the default.
 
-Every other setting is just as strict. A default applies only when the key is absent (unset or
-`null`). Integers accept an `int` or a plain integer string (every env value is a string):
-`MESSAGES_PRUNE_DAYS=ninety`, `12.5` or a blank value throws rather than becoming `0` — which
-for `prune.days` would have meant pruning every message. A broadcast channel or event name, a
-bucket or disk name must be a non-empty string; `media.visibility` must be `private` or
+Every other setting is just as strict. A setting that is not set — absent, `null`, or blank like
+a host's `MESSAGES_PRUNE_DAYS=` — takes its default; an optional one (`media.disk`,
+`media.max_file_size`, `media.temporary_url_lifetime`) stays unset. Integers accept an `int` or a
+plain integer string (every env value is a string): `MESSAGES_PRUNE_DAYS=ninety` or `12.5` throws
+rather than becoming `0` — which for `prune.days` would have meant pruning every message. A
+broadcast channel or event name, a bucket or disk name must be a string; `media.visibility` must be `private` or
 `public`; the notification class must be a `Notification` subclass. `php artisan about`
 renders a broken setting as `INVALID` instead of failing.
 

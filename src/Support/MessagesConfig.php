@@ -12,9 +12,10 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
 /**
  * Strict readers for the package's non-boolean settings.
  *
- * A default applies only when the key is absent (null). Anything present but unusable —
- * `ninety` for a retention window, `pubic` for a visibility, a blank disk or broadcast channel —
- * throws {@see InvalidConfigurationException} naming the key, so a typo never quietly falls back
+ * A setting that is not set — absent, null, or blank like a host's `KEY=` — takes its default
+ * (or, for an optional setting, none). Anything else unusable — `ninety` for a retention window,
+ * `pubic` for a visibility, an array for a disk or broadcast channel — throws
+ * {@see InvalidConfigurationException} naming the key, so a typo never quietly falls back
  * (a junk prune window used to read as 0: prune every message).
  *
  * @internal
@@ -69,13 +70,13 @@ final class MessagesConfig
      */
     public static function acceptedMimeTypes(): array
     {
-        return self::stringList('messages.media.accepted_mime_types', config('messages.media.accepted_mime_types') ?? []);
+        return self::stringList('messages.media.accepted_mime_types', self::unlessBlank(config('messages.media.accepted_mime_types')) ?? []);
     }
 
     /** The attachment size cap in bytes, or null for media-library's own limit. */
     public static function maxFileSize(): ?int
     {
-        return config('messages.media.max_file_size') === null
+        return self::unlessBlank(config('messages.media.max_file_size')) === null
             ? null
             : Config::integer('messages.media.max_file_size', 1, 1);
     }
@@ -88,7 +89,7 @@ final class MessagesConfig
     public static function responsiveWidths(): ?array
     {
         $key = 'messages.media.responsive_widths';
-        $widths = config($key);
+        $widths = self::unlessBlank(config($key));
 
         if ($widths === null) {
             return null;
@@ -111,7 +112,7 @@ final class MessagesConfig
     /** The configured signed-URL lifetime in minutes, or null for media-library's default. */
     public static function configuredTemporaryUrlLifetime(): ?int
     {
-        return config('messages.media.temporary_url_lifetime') === null
+        return self::unlessBlank(config('messages.media.temporary_url_lifetime')) === null
             ? null
             : Config::integer('messages.media.temporary_url_lifetime', 5, 1);
     }
@@ -131,7 +132,7 @@ final class MessagesConfig
     public static function notification(): string
     {
         $key = 'messages.notifications.notification';
-        $class = config($key) ?? NewMessageNotification::class;
+        $class = self::unlessBlank(config($key)) ?? NewMessageNotification::class;
 
         if (! is_string($class) || ! is_subclass_of($class, Notification::class)) {
             throw InvalidConfigurationException::notAnImplementation($key, Notification::class, $class);
@@ -147,7 +148,7 @@ final class MessagesConfig
      */
     public static function notificationChannels(): array
     {
-        return self::stringList('messages.notifications.channels', config('messages.notifications.channels') ?? ['database']);
+        return self::stringList('messages.notifications.channels', self::unlessBlank(config('messages.notifications.channels')) ?? ['database']);
     }
 
     public static function threadPublicChannel(): string
@@ -213,17 +214,26 @@ final class MessagesConfig
 
     private static function optionalString(string $key): ?string
     {
-        $value = config($key);
+        $value = self::unlessBlank(config($key));
 
         if ($value === null) {
             return null;
         }
 
-        if (! is_string($value) || trim($value) === '') {
+        if (! is_string($value)) {
             throw InvalidConfigurationException::notAString($key, $value);
         }
 
         return $value;
+    }
+
+    /**
+     * A raw config value, with a blank string (`''` or whitespace — a host's `KEY=`) read as
+     * null: not set, exactly like an absent key.
+     */
+    private static function unlessBlank(mixed $value): mixed
+    {
+        return is_string($value) && trim($value) === '' ? null : $value;
     }
 
     /**

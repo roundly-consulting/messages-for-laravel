@@ -10,14 +10,19 @@ use RoundlyConsulting\Messages\Events\ParticipantTyping;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
+use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Tests\Models\NotifiableUser;
 use RoundlyConsulting\Messages\Tests\Models\User;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 
 /**
  * Sweep 2 — the non-boolean settings. `(int) config()` read `MESSAGES_PRUNE_DAYS=ninety` as 0 —
- * a prune with no retention at all; an attachment visibility typo, a blank bucket or disk, a junk
- * lifetime and a null broadcast channel quietly fell back or were cast to `''`. Each now throws.
+ * a prune with no retention at all; an attachment visibility typo, a non-string bucket or disk, a
+ * junk lifetime and a junk broadcast channel quietly fell back or were cast to `''`. Each now throws.
+ *
+ * Sweep 3 — a blank value (a host's `KEY=`, or whitespace) is not set: it takes the default,
+ * exactly like an absent key. Junk still throws.
  */
 beforeEach(function (): void {
     Storage::fake('public');
@@ -56,9 +61,18 @@ it('refuses a junk or non-positive prune window instead of pruning everything (s
         ->and(Message::query()->count())->toBe(1);
 })->with([
     'junk' => ['ninety', 'Configuration value [messages.prune.days] must be an integer, [ninety] given.'],
-    'blank' => ['', "Configuration value [messages.prune.days] must be an integer, [''] given."],
+    'decimal' => ['7.5', 'Configuration value [messages.prune.days] must be an integer, [7.5] given.'],
     'zero' => [0, 'Configuration value [messages.prune.days] must be at least 1, [0] given.'],
 ]);
+
+it('reads a blank prune window as not set, so the 90-day default applies (strict config)', function (string $blank): void {
+    config()->set('messages.prune.days', $blank);
+    $kept = strictMessage();
+    $kept->forceFill(['created_at' => now()->subDays(89)])->save();
+
+    expect(Messages::prune())->toBe(0)
+        ->and(MessagesConfig::pruneDays())->toBe(90);
+})->with(['empty' => [''], 'whitespace' => [' ']]);
 
 it('refuses a junk prune window in the command too (strict config)', function (): void {
     config()->set('messages.prune.days', 'ninety');
@@ -90,25 +104,55 @@ it('refuses an attachment visibility typo (strict config)', function (mixed $val
         InvalidConfigurationException::class,
         'Configuration value [messages.media.visibility] must be one of [private, public]',
     );
-})->with(['typo' => ['pubic'], 'capitalised' => ['Private'], 'blank' => ['']]);
+})->with(['typo' => ['pubic'], 'capitalised' => ['Private']]);
 
-it('keeps attachments private when the visibility is absent (strict config)', function (): void {
-    config()->set('messages.media.visibility', null);
+it('keeps attachments private when the visibility is absent or blank (strict config)', function (?string $value): void {
+    config()->set('messages.media.visibility', $value);
 
     expect(strictMessage()->resolveMediaBucket('attachments')?->getVisibility())->toBe('private');
-});
+})->with(['absent' => [null], 'blank' => [''], 'whitespace' => [' ']]);
 
-it('refuses a blank or non-string media storage setting (strict config)', function (string $key, mixed $value): void {
+it('refuses a non-string media storage setting (strict config)', function (string $key, mixed $value): void {
     config()->set($key, $value);
 
     expect(fn () => strictMessage()->resolveMediaBucket('attachments'))
         ->toThrow(InvalidConfigurationException::class, "Configuration value [{$key}] must be a non-empty string");
 })->with([
-    'bucket blank' => ['messages.media.attachments_bucket', ''],
     'bucket array' => ['messages.media.attachments_bucket', ['a']],
-    'disk blank' => ['messages.media.disk', ''],
+    'disk int' => ['messages.media.disk', 1],
     'private disk int' => ['messages.media.private_disk', 3],
 ]);
+
+it('reads a blank media storage setting as not set (strict config)', function (): void {
+    config()->set('messages.media.attachments_bucket', '');
+    config()->set('messages.media.disk', ' ');
+    config()->set('messages.media.private_disk', '');
+
+    $bucket = strictMessage()->resolveMediaBucket('attachments');
+
+    expect(MessagesConfig::attachmentsBucket())->toBe('attachments')
+        ->and(MessagesConfig::disk())->toBeNull()
+        ->and(MessagesConfig::privateDisk())->toBe('local')
+        ->and($bucket?->getDisk())->toBe('local');
+});
+
+it('reads a blank optional media or notification setting as not set (strict config)', function (): void {
+    config()->set('messages.media.max_file_size', '');
+    config()->set('messages.media.responsive_widths', ' ');
+    config()->set('messages.media.temporary_url_lifetime', '');
+    config()->set('media.temporary_url_default_lifetime', 9);
+    config()->set('messages.media.accepted_mime_types', '');
+    config()->set('messages.notifications.notification', '');
+    config()->set('messages.notifications.channels', ' ');
+
+    expect(MessagesConfig::maxFileSize())->toBeNull()
+        ->and(MessagesConfig::responsiveWidths())->toBeNull()
+        ->and(MessagesConfig::configuredTemporaryUrlLifetime())->toBeNull()
+        ->and(MessagesConfig::temporaryUrlLifetime())->toBe(9)
+        ->and(MessagesConfig::acceptedMimeTypes())->toBe([])
+        ->and(MessagesConfig::notification())->toBe(NewMessageNotification::class)
+        ->and(MessagesConfig::notificationChannels())->toBe(['database']);
+});
 
 it('refuses a junk media list or size (strict config)', function (string $key, mixed $value): void {
     config()->set($key, $value);
@@ -146,11 +190,11 @@ it('refuses a junk signed-url lifetime (strict config)', function (string $key, 
     'media default junk' => ['media.temporary_url_default_lifetime', 'soon'],
 ]);
 
-it('refuses a blank or missing broadcast name instead of broadcasting on an empty one (strict config)', function (string $key, Closure $read): void {
+it('refuses a non-string broadcast name instead of broadcasting on a junk one (strict config)', function (string $key, Closure $read): void {
     config()->set('messages.broadcasting.enabled', true);
     $message = strictMessage();
 
-    foreach (['', ['x'], 5] as $value) {
+    foreach ([['x'], 5, true] as $value) {
         config()->set($key, $value);
 
         expect(fn () => $read($message))->toThrow(InvalidConfigurationException::class, $key);
@@ -165,15 +209,17 @@ it('refuses a blank or missing broadcast name instead of broadcasting on an empt
     'thread per-participant channel' => ['messages.broadcasting.threads.per-participant-channel', fn (Message $m) => $m->thread->broadcastOn('created')],
 ]);
 
-it('uses the shipped broadcast names when they are absent (strict config)', function (): void {
+it('uses the shipped broadcast names when they are absent or blank (strict config)', function (?string $value): void {
     config()->set('messages.broadcasting.enabled', true);
-    config()->set('messages.broadcasting.messages.channel', null);
-    config()->set('messages.broadcasting.messages.events.created', null);
+    config()->set('messages.broadcasting.messages.channel', $value);
+    config()->set('messages.broadcasting.messages.events.created', $value);
+    config()->set('messages.broadcasting.typing.event', $value);
     $message = strictMessage();
 
     expect($message->broadcastOn('created')->name)->toBe('private-messaging.thread.'.$message->thread_id)
-        ->and($message->broadcastAs('created'))->toBe('messaging.message.sent');
-});
+        ->and($message->broadcastAs('created'))->toBe('messaging.message.sent')
+        ->and(MessagesConfig::typingEvent())->toBe('messaging.participant.typing');
+})->with(['absent' => [null], 'blank' => [''], 'whitespace' => [' ']]);
 
 it('refuses a notification class or channel list that does not fit (strict config)', function (string $key, mixed $value): void {
     config()->set('messages.notifications.enabled', true);

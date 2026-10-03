@@ -136,15 +136,16 @@ return [
 
     'prune' => [
         // Default retention window (in days, at least 1) for the messages:prune command. A
-        // non-integer value ("ninety", "") throws instead of reading as 0 (prune everything).
+        // non-integer value ("ninety", "7.5") throws instead of reading as 0 (prune everything);
+        // a blank value is not set, so the 90-day default applies.
         'days' => env('MESSAGES_PRUNE_DAYS', 90),
     ],
 
     'broadcasting' => [
         'enabled' => env('REALTIME_MESSAGES', false),
 
-        // Channel and event names below must be non-empty strings; a blank or non-string
-        // value throws instead of broadcasting on an empty name.
+        // Channel and event names below must be strings; a non-string value throws instead
+        // of broadcasting on a junk name. A blank value is not set: the shipped name applies.
 
         'threads' => [
             'public-channel' => 'messaging',
