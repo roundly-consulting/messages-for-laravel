@@ -189,7 +189,8 @@ class Participant extends Model
 
     /**
      * Literal keys (via {@see MessagesConfig::participantEvent()}) rather than a concatenated
-     * one — see {@see Message::broadcastAs()}. A blank or non-string name throws.
+     * one — see {@see Message::broadcastAs()}. A blank name is not set (the shipped name
+     * applies); a non-string one throws.
      */
     public function broadcastAs(string $event): string
     {

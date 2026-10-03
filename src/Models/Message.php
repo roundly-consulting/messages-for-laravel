@@ -262,7 +262,8 @@ class Message extends Model implements HasMedia
      * Read through {@see MessagesConfig::messageEvent()}, which names each of the five
      * literal keys rather than `config('messages.broadcasting.messages.events.'.$event)`: a
      * concatenated key cannot be verified against the shipped config file (shops #18). An
-     * event the package never broadcasts returns ''; a blank or non-string name throws.
+     * event the package never broadcasts returns ''; a blank name is not set (the shipped name
+     * applies) and a non-string one throws.
      */
     public function broadcastAs(string $event): string
     {
