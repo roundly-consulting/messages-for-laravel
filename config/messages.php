@@ -22,8 +22,8 @@ return [
     | The primary-key strategy of the models this package points *at* polymorphically:
     | the message sender and the thread participant. It sets the column type of the
     | sender / participant morph keys and must match those models' primary key:
-    | "bigint" (the Laravel default), "uuid" or "ulid". Anything unrecognized falls
-    | back to "bigint".
+    | "bigint" (the Laravel default), "uuid" or "ulid". Anything else throws an
+    | InvalidConfigurationException.
     |
     | This is a DIFFERENT axis from "primary_key_type" below: this is your senders'
     | and participants' key type (the models you point at), that is the package's own
@@ -43,7 +43,7 @@ return [
     | The primary-key strategy of the package's own tables — threads, messages and
     | participants, plus every internal foreign key between them (thread_id,
     | parent_message_id, last_read_message_id): "bigint" (the Laravel default),
-    | "uuid" or "ulid". Anything unrecognized falls back to "bigint".
+    | "uuid" or "ulid". Anything else throws an InvalidConfigurationException.
     |
     | This is the key OTHER packages' polymorphic columns point at. A morph column
     | (`likeable_id`, `reportable_id`, ...) defaults to an unsigned bigint, so on a

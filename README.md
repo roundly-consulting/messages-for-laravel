@@ -788,7 +788,8 @@ return [
 
 Every `bool` switch is parsed as a boolean, so `.env` values mean what they say:
 `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no` turn it off (`MESSAGES_PERMISSIONS=1`
-enforces roles, `THREADS_PUBLIC=off` keeps new threads private).
+enforces roles, `THREADS_PUBLIC=off` keeps new threads private). Anything else throws
+`InvalidConfigurationException` instead of quietly reading as the default.
 
 ### Key types
 
