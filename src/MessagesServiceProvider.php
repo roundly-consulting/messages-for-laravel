@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages;
 
+use Closure;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Messages\Commands\PruneMessagesCommand;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Listeners\NotifyParticipantsOfNewMessage;
 use RoundlyConsulting\Messages\Listeners\WarmMessageMediaVariants;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -72,18 +75,22 @@ final class MessagesServiceProvider extends PackageServiceProvider
                 'System messages' => Config::boolean('messages.system-messages.enabled') ? 'ON' : 'OFF',
                 'Notifications' => self::notifications(),
                 'Broadcasting' => Config::boolean('messages.broadcasting.enabled') ? 'ON' : 'OFF',
-                'Preview length' => self::intValue('messages.preview.length', 120).' chars',
-                'Prune retention' => self::intValue('messages.prune.days', 90).' days',
-                'Attachments' => self::attachments(),
-                'Attachment disk' => self::presence('messages.media.disk', 'MEDIA DEFAULT'),
-                'Accepted types' => self::listSize('messages.media.accepted_mime_types', 'mime type', 'ANY'),
-                'Max attachment size' => self::bytes(),
-                'Responsive widths' => self::listSize('messages.media.responsive_widths', 'width', 'MEDIA DEFAULT'),
+                'Preview length' => self::orInvalid(static fn (): string => MessagesConfig::previewLength().' chars'),
+                'Prune retention' => self::orInvalid(static fn (): string => MessagesConfig::pruneDays().' days'),
+                'Attachments' => self::orInvalid(static fn (): string => sprintf(
+                    '%s bucket (%s)',
+                    MessagesConfig::attachmentsBucket(),
+                    MessagesConfig::attachmentsVisibility(),
+                )),
+                'Attachment disk' => self::orInvalid(static fn (): string => MessagesConfig::disk() === null ? 'MEDIA DEFAULT' : 'SET'),
+                'Accepted types' => self::orInvalid(static fn (): string => self::count(MessagesConfig::acceptedMimeTypes(), 'mime type', 'ANY')),
+                'Max attachment size' => self::orInvalid(static fn (): string => ($max = MessagesConfig::maxFileSize()) === null ? 'MEDIA DEFAULT' : $max.' B'),
+                'Responsive widths' => self::orInvalid(static fn (): string => self::count(MessagesConfig::responsiveWidths() ?? [], 'width', 'MEDIA DEFAULT')),
                 'Warm variants on send' => Config::boolean('messages.media.warm_on_send', true) ? 'ON' : 'OFF',
                 'Attachment cleanup' => Config::boolean('messages.media.cleanup_on_force_delete', true)
                     ? 'ON FORCE DELETE'
                     : 'OFF',
-                'Signed URL lifetime' => self::signedUrlLifetime(),
+                'Signed URL lifetime' => self::orInvalid(static fn (): string => ($minutes = MessagesConfig::configuredTemporaryUrlLifetime()) === null ? 'MEDIA DEFAULT' : $minutes.' min'),
             ]);
     }
 
@@ -108,35 +115,28 @@ final class MessagesServiceProvider extends PackageServiceProvider
     }
 
     /**
-     * Whether a config key holds a non-empty value — never the value itself. The
-     * attachment disk names a host filesystem, so only its presence is reported.
+     * A strict read rendered for `about`, or `INVALID` when the setting is broken — so
+     * `php artisan about` still works on a misconfigured host while every real read throws.
+     *
+     * @param  Closure(): string  $read
      */
-    private static function presence(string $key, string $absent): string
+    private static function orInvalid(Closure $read): string
     {
-        $value = config($key);
-
-        return is_string($value) && $value !== '' ? 'SET' : $absent;
-    }
-
-    private static function intValue(string $key, int $default): int
-    {
-        $value = config($key);
-
-        return is_numeric($value) ? (int) $value : $default;
+        try {
+            return $read();
+        } catch (InvalidConfigurationException) {
+            return 'INVALID';
+        }
     }
 
     /**
      * The size of a configured list, never its entries.
+     *
+     * @param  list<mixed>  $values
      */
-    private static function listSize(string $key, string $noun, string $absent): string
+    private static function count(array $values, string $noun, string $absent): string
     {
-        $value = config($key);
-
-        if (! is_array($value) || $value === []) {
-            return $absent;
-        }
-
-        return sprintf('%d %s(s)', count($value), $noun);
+        return $values === [] ? $absent : sprintf('%d %s(s)', count($values), $noun);
     }
 
     private static function publicity(): string
@@ -157,39 +157,10 @@ final class MessagesServiceProvider extends PackageServiceProvider
             return 'OFF';
         }
 
-        $notification = config('messages.notifications.notification');
-        $channels = config('messages.notifications.channels');
-
-        return sprintf(
+        return self::orInvalid(static fn (): string => sprintf(
             'ON (%s, %d channel(s))',
-            is_string($notification) && $notification !== '' ? class_basename($notification) : 'DEFAULT',
-            is_array($channels) ? count($channels) : 0,
-        );
-    }
-
-    private static function attachments(): string
-    {
-        $bucket = config('messages.media.attachments_bucket');
-        $visibility = config('messages.media.visibility');
-
-        return sprintf(
-            '%s bucket (%s)',
-            is_string($bucket) && $bucket !== '' ? $bucket : 'attachments',
-            is_string($visibility) && $visibility !== '' ? $visibility : 'private',
-        );
-    }
-
-    private static function bytes(): string
-    {
-        $max = config('messages.media.max_file_size');
-
-        return is_numeric($max) ? ((int) $max).' B' : 'MEDIA DEFAULT';
-    }
-
-    private static function signedUrlLifetime(): string
-    {
-        $minutes = config('messages.media.temporary_url_lifetime');
-
-        return is_numeric($minutes) ? ((int) $minutes).' min' : 'MEDIA DEFAULT';
+            class_basename(MessagesConfig::notification()),
+            count(MessagesConfig::notificationChannels()),
+        ));
     }
 }

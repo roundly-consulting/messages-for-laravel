@@ -20,6 +20,7 @@ use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\MessagesManager;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
@@ -179,7 +180,7 @@ class Participant extends Model
             return [];
         }
 
-        $channel = (string) config('messages.broadcasting.participants.channel');
+        $channel = MessagesConfig::participantsChannel();
 
         return new PrivateChannel(
             str_replace('{id}', (string) $this->thread_id, $channel),
@@ -187,21 +188,11 @@ class Participant extends Model
     }
 
     /**
-     * Literal keys rather than `config('messages.broadcasting.participants.events.'.$event)`.
-     * See {@see Message::broadcastAs()} — a concatenated key cannot be checked against the
-     * shipped file, and the event set is closed.
+     * Literal keys (via {@see MessagesConfig::participantEvent()}) rather than a concatenated
+     * one — see {@see Message::broadcastAs()}. A blank or non-string name throws.
      */
     public function broadcastAs(string $event): string
     {
-        $key = match ($event) {
-            'created' => 'messages.broadcasting.participants.events.created',
-            'updated' => 'messages.broadcasting.participants.events.updated',
-            'trashed' => 'messages.broadcasting.participants.events.trashed',
-            'restored' => 'messages.broadcasting.participants.events.restored',
-            'deleted' => 'messages.broadcasting.participants.events.deleted',
-            default => null,
-        };
-
-        return $key === null ? '' : (string) config($key);
+        return MessagesConfig::participantEvent($event);
     }
 }

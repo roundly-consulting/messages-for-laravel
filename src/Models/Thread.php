@@ -22,6 +22,7 @@ use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -384,10 +385,10 @@ class Thread extends Model
         }
 
         if ($this->is_public) {
-            return new Channel((string) config('messages.broadcasting.threads.public-channel'));
+            return new Channel(MessagesConfig::threadPublicChannel());
         }
 
-        $template = (string) config('messages.broadcasting.threads.per-participant-channel');
+        $template = MessagesConfig::threadPerParticipantChannel();
 
         // A fresh query, never `$this->participants`: this runs whenever the model event fires,
         // and loading the relation here would cache whatever the thread held at that moment on
@@ -408,6 +409,6 @@ class Thread extends Model
 
     public function broadcastAs(string $event): string
     {
-        return (string) config('messages.broadcasting.threads.events.created');
+        return MessagesConfig::threadCreatedEvent();
     }
 }

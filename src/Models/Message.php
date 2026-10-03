@@ -26,6 +26,7 @@ use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -130,7 +131,7 @@ class Message extends Model implements HasMedia
     /** A short, type-aware, truncated preview suitable for an inbox list. */
     public function preview(): string
     {
-        $length = (int) config('messages.preview.length', 120);
+        $length = MessagesConfig::previewLength();
 
         if ($this->type === MessageType::System) {
             $rendered = trans($this->message, $this->systemReplacements());
@@ -250,7 +251,7 @@ class Message extends Model implements HasMedia
             return [];
         }
 
-        $channel = (string) config('messages.broadcasting.messages.channel');
+        $channel = MessagesConfig::messagesChannel();
 
         return new PrivateChannel(
             str_replace('{id}', (string) $this->thread_id, $channel),
@@ -258,26 +259,13 @@ class Message extends Model implements HasMedia
     }
 
     /**
-     * Literal keys rather than `config('messages.broadcasting.messages.events.'.$event)`: a
-     * concatenated key cannot be verified against the shipped config file, which is the exact
-     * shape that let shops #18 read a key the package never shipped while its suite stayed
-     * green. The set is closed — {@see BroadcastsEvents} broadcasts precisely these five —
-     * so enumerating them costs nothing and makes every leaf checkable.
-     *
-     * An unknown event returns '' exactly as the concatenated read did (a missing key gave
-     * null, cast to '').
+     * Read through {@see MessagesConfig::messageEvent()}, which names each of the five
+     * literal keys rather than `config('messages.broadcasting.messages.events.'.$event)`: a
+     * concatenated key cannot be verified against the shipped config file (shops #18). An
+     * event the package never broadcasts returns ''; a blank or non-string name throws.
      */
     public function broadcastAs(string $event): string
     {
-        $key = match ($event) {
-            'created' => 'messages.broadcasting.messages.events.created',
-            'updated' => 'messages.broadcasting.messages.events.updated',
-            'trashed' => 'messages.broadcasting.messages.events.trashed',
-            'restored' => 'messages.broadcasting.messages.events.restored',
-            'deleted' => 'messages.broadcasting.messages.events.deleted',
-            default => null,
-        };
-
-        return $key === null ? '' : (string) config($key);
+        return MessagesConfig::messageEvent($event);
     }
 }

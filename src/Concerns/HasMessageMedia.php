@@ -13,6 +13,7 @@ use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\MediaLibrary\Support\MediaUrlResolver;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 
 /**
  * First-class file attachments for the bundled Message model, built on
@@ -34,35 +35,33 @@ trait HasMessageMedia
         $bucket = $this->addMediaBucket($this->attachmentsBucket())
             ->withVisibility($this->attachmentsVisibility());
 
-        $accepted = config('messages.media.accepted_mime_types');
+        $accepted = MessagesConfig::acceptedMimeTypes();
 
-        if (is_array($accepted) && $accepted !== []) {
-            $bucket->acceptsMimeTypes($this->stringList($accepted));
+        if ($accepted !== []) {
+            $bucket->acceptsMimeTypes($accepted);
         }
 
-        $maxFileSize = config('messages.media.max_file_size');
+        $maxFileSize = MessagesConfig::maxFileSize();
 
-        if (is_int($maxFileSize) && $maxFileSize > 0) {
+        if ($maxFileSize !== null) {
             $bucket->maxFileSize($maxFileSize);
         }
 
-        $disk = config('messages.media.disk');
+        $disk = MessagesConfig::disk();
 
-        if (is_string($disk) && $disk !== '') {
+        if ($disk !== null) {
             $bucket->useDisk($disk);
-        } elseif ($this->attachmentsVisibility() === 'private') {
+        } elseif ($this->attachmentsVisibility() === MessagesConfig::VISIBILITY_PRIVATE) {
             // A private attachment must not land on media-library's default disk: that is the
             // web-served `public` disk, where the file is reachable under /storage without the
             // signed URL. Its variants follow it, whatever `media.variants_disk` says.
-            $privateDisk = $this->privateAttachmentsDisk();
+            $privateDisk = MessagesConfig::privateDisk();
 
             $bucket->useDisk($privateDisk)->storingVariantsOnDisk($privateDisk);
         }
 
-        $widths = config('messages.media.responsive_widths');
-
         // null lets media-library apply its configured default ladder; an explicit list overrides.
-        $bucket->responsiveWidths(is_array($widths) ? $this->normalizeWidths($widths) : null);
+        $bucket->responsiveWidths(MessagesConfig::responsiveWidths());
     }
 
     /**
@@ -143,65 +142,16 @@ trait HasMessageMedia
 
     public function attachmentsBucket(): string
     {
-        return (string) config('messages.media.attachments_bucket', 'attachments');
+        return MessagesConfig::attachmentsBucket();
     }
 
     private function attachmentsVisibility(): string
     {
-        $visibility = config('messages.media.visibility', 'private');
-
-        return $visibility === 'public' ? 'public' : 'private';
-    }
-
-    private function privateAttachmentsDisk(): string
-    {
-        $disk = config('messages.media.private_disk', 'local');
-
-        return is_string($disk) && $disk !== '' ? $disk : 'local';
+        return MessagesConfig::attachmentsVisibility();
     }
 
     private function temporaryUrlExpiry(): DateTimeInterface
     {
-        $minutes = config('messages.media.temporary_url_lifetime');
-
-        if (! is_numeric($minutes)) {
-            $minutes = config('media.temporary_url_default_lifetime', 5);
-        }
-
-        return CarbonImmutable::now()->addMinutes(is_numeric($minutes) ? (int) $minutes : 5);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $values
-     * @return list<string>
-     */
-    private function stringList(array $values): array
-    {
-        $clean = [];
-
-        foreach ($values as $value) {
-            if (is_string($value) && $value !== '') {
-                $clean[] = $value;
-            }
-        }
-
-        return $clean;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $widths
-     * @return list<int>
-     */
-    private function normalizeWidths(array $widths): array
-    {
-        $clean = [];
-
-        foreach ($widths as $width) {
-            if (is_int($width) && $width > 0) {
-                $clean[] = $width;
-            }
-        }
-
-        return $clean;
+        return CarbonImmutable::now()->addMinutes(MessagesConfig::temporaryUrlLifetime());
     }
 }

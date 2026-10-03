@@ -13,6 +13,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
@@ -36,14 +37,14 @@ final class ParticipantTyping implements ShouldBroadcast
             return [];
         }
 
-        $channel = (string) config('messages.broadcasting.messages.channel');
+        $channel = MessagesConfig::messagesChannel();
 
         return [new PrivateChannel(str_replace('{id}', (string) $this->thread->getKey(), $channel))];
     }
 
     public function broadcastAs(): string
     {
-        return (string) config('messages.broadcasting.typing.event');
+        return MessagesConfig::typingEvent();
     }
 
     /** @return array<string, mixed> */

@@ -6,9 +6,10 @@ namespace RoundlyConsulting\Messages\Listeners;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
+use ReflectionClass;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Models\Thread;
-use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
@@ -39,9 +40,10 @@ final class NotifyParticipantsOfNewMessage
             return;
         }
 
-        /** @var class-string<NewMessageNotification> $notification */
-        $notification = config('messages.notifications.notification', NewMessageNotification::class);
+        // Any Notification subclass taking the message — the packaged class, a published copy of
+        // it, or the host's own; a value that is not one throws.
+        $notification = (new ReflectionClass(MessagesConfig::notification()))->newInstance($event->message);
 
-        NotificationFacade::send($recipients, new $notification($event->message));
+        NotificationFacade::send($recipients, $notification);
     }
 }

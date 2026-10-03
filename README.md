@@ -494,18 +494,20 @@ Force-deleting a message (hard delete / prune) removes its attachment files; sof
     'attachments_bucket'      => 'attachments', // media-library bucket name
     'disk'                    => env('MESSAGES_MEDIA_DISK', null),       // null = by visibility (below)
     'private_disk'            => env('MESSAGES_MEDIA_PRIVATE_DISK', 'local'), // private attachments when 'disk' is null
-    'visibility'              => env('MESSAGES_MEDIA_VISIBILITY', 'private'), // 'private' | 'public'
+    'visibility'              => env('MESSAGES_MEDIA_VISIBILITY', 'private'), // 'private' | 'public' (else throws)
     'accepted_mime_types'     => [],            // [] = accept any file
-    'max_file_size'           => null,          // bytes; null = media default
-    'responsive_widths'       => null,          // null = media default ladder
+    'max_file_size'           => null,          // bytes (>= 1); null = media default
+    'responsive_widths'       => null,          // positive ints; null = media default ladder
     'warm_on_send'            => true,          // queue variant generation on send
-    'temporary_url_lifetime'  => null,          // minutes; null = media default
+    'temporary_url_lifetime'  => null,          // minutes (>= 1); null = media default
     'cleanup_on_force_delete' => true,          // remove files on hard delete / prune
 ],
 ```
 
 An explicit `disk` is used for every attachment whatever its visibility, so keep it non-public
 while attachments are private; `private_disk` can point at any non-public disk (e.g. private S3).
+A `visibility` typo, a blank or non-string bucket or disk name, or a junk size, width, lifetime
+or mime-type entry throws `InvalidConfigurationException` — it never falls back.
 
 ## Notifications
 
@@ -772,10 +774,10 @@ return [
 | `system-messages.enabled` | bool | `false` | `MESSAGES_SYSTEM_MESSAGES` | Write "joined / left / renamed" system messages. |
 | `permissions.enabled` | bool | `true` | `MESSAGES_PERMISSIONS` | Enforce roles on group threads (roles are kept either way). |
 | `notifications.enabled` | bool | `false` | `MESSAGES_NOTIFICATIONS` | Notify the other participants of a new message. |
-| `notifications.notification` | class-string | `NewMessageNotification` | — | The notification sent. |
-| `notifications.channels` | list | `['database']` | — | Channels the default notification uses. |
-| `preview.length` | int | `120` | `MESSAGES_PREVIEW_LENGTH` | Length of previews and quote excerpts. |
-| `prune.days` | int | `90` | `MESSAGES_PRUNE_DAYS` | Default retention for `messages:prune`. |
+| `notifications.notification` | class-string | `NewMessageNotification` | — | The notification sent: a `Notification` subclass constructed with the message. |
+| `notifications.channels` | list | `['database']` | — | Channels the default notification uses (non-empty strings). |
+| `preview.length` | int | `120` | `MESSAGES_PREVIEW_LENGTH` | Length of previews and quote excerpts, at least `1`. |
+| `prune.days` | int | `90` | `MESSAGES_PRUNE_DAYS` | Default retention for `messages:prune` and `Messages::prune()`, at least `1`. |
 | `broadcasting.enabled` | bool | `false` | `REALTIME_MESSAGES` | Broadcast over Laravel broadcasting — see [Broadcasting](#broadcasting). |
 | `broadcasting.threads.public-channel` | string | `messaging` | — | Channel a new public thread is announced on. |
 | `broadcasting.threads.per-participant-channel` | string | `messaging.participant.{name}.{id}` | — | Private channel a new private thread is announced on, once per participant. |
@@ -790,6 +792,14 @@ Every `bool` switch is parsed as a boolean, so `.env` values mean what they say:
 `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no` turn it off (`MESSAGES_PERMISSIONS=1`
 enforces roles, `THREADS_PUBLIC=off` keeps new threads private). Anything else throws
 `InvalidConfigurationException` instead of quietly reading as the default.
+
+Every other setting is just as strict. A default applies only when the key is absent (unset or
+`null`). Integers accept an `int` or a plain integer string (every env value is a string):
+`MESSAGES_PRUNE_DAYS=ninety`, `12.5` or a blank value throws rather than becoming `0` — which
+for `prune.days` would have meant pruning every message. A broadcast channel or event name, a
+bucket or disk name must be a non-empty string; `media.visibility` must be `private` or
+`public`; the notification class must be a `Notification` subclass. `php artisan about`
+renders a broken setting as `INVALID` instead of failing.
 
 ### Key types
 

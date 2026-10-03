@@ -13,6 +13,7 @@ use RoundlyConsulting\Messages\Exceptions\MessageException;
 use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 
 final class SendMessage
 {
@@ -130,7 +131,7 @@ final class SendMessage
             'id' => $parent->getKey(),
             'sender_id' => $parent->sender_id,
             'sender_type' => $parent->sender_type,
-            'excerpt' => Str::limit($parent->message, (int) config('messages.preview.length', 120)),
+            'excerpt' => Str::limit($parent->message, MessagesConfig::previewLength()),
         ];
 
         return $meta;

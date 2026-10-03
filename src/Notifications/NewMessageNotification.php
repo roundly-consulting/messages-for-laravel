@@ -8,6 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 
 /**
  * Sent to a thread's other participants when a new message arrives. To customise channels and
@@ -30,10 +31,7 @@ class NewMessageNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        /** @var array<int, string> $channels */
-        $channels = config('messages.notifications.channels', ['database']);
-
-        return $channels;
+        return MessagesConfig::notificationChannels();
     }
 
     /**

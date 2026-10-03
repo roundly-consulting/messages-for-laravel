@@ -79,21 +79,24 @@ return [
 
         // Attachments are private by default and reachable only through media's signed
         // streaming route. Set to 'public' to expose direct URLs (not recommended for DMs).
+        // Anything other than 'private' / 'public' throws.
         'visibility' => env('MESSAGES_MEDIA_VISIBILITY', 'private'),
 
         // Allowed mime types. [] = accept any file (images and non-images alike).
         'accepted_mime_types' => [],
 
-        // Maximum accepted attachment size in bytes. null = media-library's default.
+        // Maximum accepted attachment size in bytes (at least 1). null = media-library's default.
         'max_file_size' => null,
 
-        // Responsive width ladder for image attachments. null = media-library's default ladder.
+        // Responsive width ladder (positive integers) for image attachments. null =
+        // media-library's default ladder.
         'responsive_widths' => null,
 
         // Queue a GenerateVariantsJob for each image attachment when a message is sent.
         'warm_on_send' => true,
 
-        // Lifetime (in minutes) of the signed attachment URLs. null = media-library's default.
+        // Lifetime (in minutes, at least 1) of the signed attachment URLs. null =
+        // media-library's default.
         'temporary_url_lifetime' => null,
 
         // Remove attachment files when a message is force-deleted (hard delete / prune).
@@ -127,17 +130,21 @@ return [
     ],
 
     'preview' => [
-        // Maximum length of the truncated preview/quote excerpt.
+        // Maximum length of the truncated preview/quote excerpt (an integer, at least 1).
         'length' => env('MESSAGES_PREVIEW_LENGTH', 120),
     ],
 
     'prune' => [
-        // Default retention window (in days) for the messages:prune command.
+        // Default retention window (in days, at least 1) for the messages:prune command. A
+        // non-integer value ("ninety", "") throws instead of reading as 0 (prune everything).
         'days' => env('MESSAGES_PRUNE_DAYS', 90),
     ],
 
     'broadcasting' => [
         'enabled' => env('REALTIME_MESSAGES', false),
+
+        // Channel and event names below must be non-empty strings; a blank or non-string
+        // value throws instead of broadcasting on an empty name.
 
         'threads' => [
             'public-channel' => 'messaging',

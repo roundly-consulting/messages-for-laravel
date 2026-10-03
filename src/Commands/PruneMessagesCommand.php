@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Messages\Commands;
 use Illuminate\Console\Command;
 use RoundlyConsulting\Messages\Actions\PruneMessages;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 
 final class PruneMessagesCommand extends Command
 {
@@ -17,7 +18,7 @@ final class PruneMessagesCommand extends Command
     public function handle(PruneMessages $pruneMessages): int
     {
         $days = $this->option('days');
-        $days = is_numeric($days) ? (int) $days : (int) config('messages.prune.days', 90);
+        $days = is_numeric($days) ? (int) $days : MessagesConfig::pruneDays();
 
         // A thread id is a string off the CLI but an int when the key type is bigint and the
         // command is called programmatically (`Artisan::call`, a test). `is_string()` alone

@@ -21,6 +21,7 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
@@ -167,7 +168,7 @@ class MessagesManager
      */
     public function prune(?int $days = null, ?Thread $thread = null): int
     {
-        $days ??= (int) config('messages.prune.days', 90);
+        $days ??= MessagesConfig::pruneDays();
 
         return $this->perform(
             new MessagingCall(MessagingOperation::Prune, thread: $thread, days: $days),
