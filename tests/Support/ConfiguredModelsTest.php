@@ -43,14 +43,24 @@ it('throws when a configured model is not an eloquent model at all', function ()
  * Eloquent model that is not one of ours cannot answer the package's scopes, so the
  * package's own wrapper narrows and falls back to the packaged model.
  */
-it('falls back to the packaged model for a real model that is not ours', function (): void {
+it('refuses a foreign model instead of falling back to the packaged one', function (): void {
+    // The toolkit refuses any class that is not the packaged model or a subclass of it.
     config()->set('messages.models.thread', NotAMessage::class);
     config()->set('messages.models.message', NotAMessage::class);
     config()->set('messages.models.participant', NotAMessage::class);
 
-    expect(ThreadModel::class())->toBe(Thread::class)
-        ->and(MessageModel::class())->toBe(Message::class)
-        ->and(ParticipantModel::class())->toBe(Participant::class);
+    expect(fn (): string => ThreadModel::class())->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [messages.models.thread] must be a class-string of ['.Thread::class.'], ['.NotAMessage::class.'] given.',
+    );
+    expect(fn (): string => MessageModel::class())->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [messages.models.message] must be a class-string of ['.Message::class.'], ['.NotAMessage::class.'] given.',
+    );
+    expect(fn (): string => ParticipantModel::class())->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [messages.models.participant] must be a class-string of ['.Participant::class.'], ['.NotAMessage::class.'] given.',
+    );
 });
 
 /**

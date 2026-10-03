@@ -11,9 +11,9 @@ use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
  * Resolves the Eloquent model backing thread membership from
  * `messages.models.participant`.
  *
- * The toolkit's ModelResolver validates that the configured value is a real
- * Eloquent model; anything that is not a Participant (so it cannot answer the
- * package's read pointers and role checks) falls back to the packaged model.
+ * Absent config resolves the packaged model; anything else must be that model or a subclass of
+ * it, or the toolkit's ModelResolver throws InvalidConfigurationException naming the key — a
+ * foreign class is never silently replaced.
  */
 final class ParticipantModel
 {
@@ -22,9 +22,7 @@ final class ParticipantModel
      */
     public static function class(): string
     {
-        $model = ModelResolver::for('messages.models.participant', Participant::class);
-
-        return is_a($model, Participant::class, true) ? $model : Participant::class;
+        return ModelResolver::for('messages.models.participant', Participant::class);
     }
 
     public static function new(): Participant

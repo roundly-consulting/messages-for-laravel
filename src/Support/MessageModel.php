@@ -10,9 +10,9 @@ use RoundlyConsulting\PackageToolkit\Support\ModelResolver;
 /**
  * Resolves the Eloquent model backing messages from `messages.models.message`.
  *
- * The toolkit's ModelResolver validates that the configured value is a real
- * Eloquent model; anything that is not a Message (so it cannot answer the
- * package's scopes, previews and media bucket) falls back to the packaged model.
+ * Absent config resolves the packaged model; anything else must be that model or a subclass of
+ * it, or the toolkit's ModelResolver throws InvalidConfigurationException naming the key — a
+ * foreign class is never silently replaced.
  */
 final class MessageModel
 {
@@ -21,8 +21,6 @@ final class MessageModel
      */
     public static function class(): string
     {
-        $model = ModelResolver::for('messages.models.message', Message::class);
-
-        return is_a($model, Message::class, true) ? $model : Message::class;
+        return ModelResolver::for('messages.models.message', Message::class);
     }
 }
