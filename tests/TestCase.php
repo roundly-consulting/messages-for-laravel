@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Tests;
 
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
@@ -13,6 +14,8 @@ use RoundlyConsulting\Testing\PackageTestCase;
 
 abstract class TestCase extends PackageTestCase
 {
+    private string $secureRoot = '';
+
     /**
      * Every provider messages hard-requires, in registration order. A host auto-discovers
      * media-library; the suite must list it or the test environment is a fiction.
@@ -64,9 +67,34 @@ abstract class TestCase extends PackageTestCase
             // signed streaming route" fallback that private DM attachments rely on.
             'filesystems.disks.secure' => [
                 'driver' => 'local',
-                'root' => storage_path('framework/testing/disks/secure'),
+                'root' => $this->secureRoot(),
             ],
         ];
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        if ($this->secureRoot !== '') {
+            (new Filesystem)->deleteDirectory($this->secureRoot);
+            $this->secureRoot = '';
+        }
+    }
+
+    /**
+     * The `secure` disk's root: a throwaway directory per test. Under the testbench
+     * skeleton's storage/ it was ONE directory for every parallel process — each process's
+     * media ids start at 1, so their attachments collided there, and two test files wiped
+     * it in beforeEach while another process was asserting a file in it still existed.
+     */
+    private function secureRoot(): string
+    {
+        if ($this->secureRoot === '') {
+            $this->secureRoot = sys_get_temp_dir().'/messages-secure-'.bin2hex(random_bytes(6));
+        }
+
+        return $this->secureRoot;
     }
 
     /**

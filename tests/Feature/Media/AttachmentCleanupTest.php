@@ -11,12 +11,20 @@ use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
+use RoundlyConsulting\Messages\Tests\TestCase;
 
 beforeEach(function (): void {
     Storage::fake('public');
     Storage::fake('local');
     config()->set('messages.media.disk', 'secure');
-    Storage::disk('secure')->deleteDirectory('');
+});
+
+/**
+ * The real `secure` disk sits in a throwaway root per test ({@see TestCase}), never the
+ * testbench skeleton's storage/ — which every parallel process shared.
+ */
+it('stores on a sandboxed disk, never the shared skeleton', function (): void {
+    expect(Storage::disk('secure')->path(''))->toContain('messages-secure-');
 });
 
 function messageWithAttachment(string $name = 'a.jpg'): array

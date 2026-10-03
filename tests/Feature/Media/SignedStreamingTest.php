@@ -15,7 +15,6 @@ beforeEach(function (): void {
 
     // Store attachments on a real local disk (no native temporaryUrl) so the signed streaming
     // route is exercised, exactly as a private DM disk behaves in production.
-    Storage::disk('secure')->deleteDirectory('');
     config()->set('messages.media.disk', 'secure');
 });
 
