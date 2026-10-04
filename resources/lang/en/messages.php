@@ -35,5 +35,7 @@ return [
         'participant_joined' => ':participant joined the conversation.',
         'participant_left' => ':participant left the conversation.',
         'thread_renamed' => 'The conversation was renamed to :name.',
+        // Fills :participant when the participant has no name.
+        'unnamed_participant' => 'An unnamed participant',
     ],
 ];

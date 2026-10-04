@@ -6,6 +6,13 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+### Fixed
+
+- Join and leave system messages now show the participant's name (the `name` from
+  `participateAs()`) instead of the literal `:participant` placeholder, in English and Slovak.
+  A participant without a name reads as "An unnamed participant"; messages already stored render
+  correctly too.
+
 ## 1.0.1 - 2026-10-04
 
 ### Changed

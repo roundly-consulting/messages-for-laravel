@@ -99,7 +99,7 @@ abstract class TestCase extends PackageTestCase
 
     /**
      * The host-owned fixture tables the morph relations and the HasMessaging trait resolve
-     * against. The packaged migrations come from {@see migrationSources()}; these four are
+     * against. The packaged migrations come from {@see migrationSources()}; these five are
      * stand-ins for tables a host owns, so they are built here rather than shipped.
      */
     protected function defineDatabaseMigrations(): void
@@ -110,5 +110,9 @@ abstract class TestCase extends PackageTestCase
         Schema::create('restaurants', fn (Blueprint $table) => $table->id());
         Schema::create('companies', fn (Blueprint $table) => $table->id());
         Schema::create('notifiable_users', fn (Blueprint $table) => $table->id());
+        Schema::create('people', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name')->nullable();
+        });
     }
 }

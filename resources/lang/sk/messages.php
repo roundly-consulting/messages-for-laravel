@@ -35,5 +35,7 @@ return [
         'participant_joined' => 'Účastník :participant sa pripojil ku konverzácii.',
         'participant_left' => 'Účastník :participant opustil konverzáciu.',
         'thread_renamed' => 'Konverzácia bola premenovaná na :name.',
+        // Dopĺňa :participant, keď účastník nemá meno („Účastník bez mena sa pripojil…“).
+        'unnamed_participant' => 'bez mena',
     ],
 ];

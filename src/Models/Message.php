@@ -160,7 +160,30 @@ class Message extends Model implements HasMedia
             }
         }
 
+        if (array_key_exists('participant', $meta)) {
+            $replacements['participant'] = $this->participantName($meta['participant']);
+        }
+
         return $replacements;
+    }
+
+    /**
+     * Join and leave notices store the participant as its `participateAs()` snapshot — an
+     * array — so `:participant` reads as that snapshot's `name`. Without a usable name (no
+     * `name` key, a blank one, or a model that does not participate and stored `[]`) it reads
+     * as the translated "unnamed participant", never as the bare placeholder.
+     */
+    private function participantName(mixed $participant): string
+    {
+        $name = is_array($participant) ? ($participant['name'] ?? null) : $participant;
+
+        if ((is_string($name) || is_int($name) || is_float($name)) && trim((string) $name) !== '') {
+            return (string) $name;
+        }
+
+        $fallback = trans('messages::messages.system.unnamed_participant');
+
+        return is_string($fallback) ? $fallback : '';
     }
 
     /**
