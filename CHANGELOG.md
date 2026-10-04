@@ -6,6 +6,8 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+## 1.0.2 - 2026-10-04
+
 ### Fixed
 
 - Join and leave system messages now show the participant's name (the `name` from
