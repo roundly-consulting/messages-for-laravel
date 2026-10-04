@@ -22,7 +22,7 @@ final class RenameThread
     public function execute(Thread $thread, ?string $name, ?Model $actor = null): Thread
     {
         if ($actor !== null) {
-            MessagingPermissions::authorizeManage($thread, $actor, 'rename the thread');
+            MessagingPermissions::authorizeManage($thread, $actor, 'messages::messages.permissions.actions.rename-thread');
         }
 
         $previous = $thread->name;

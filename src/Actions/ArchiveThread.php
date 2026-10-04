@@ -15,7 +15,7 @@ final class ArchiveThread
     public function execute(Thread $thread, ?Model $actor = null): Thread
     {
         if ($actor !== null) {
-            MessagingPermissions::authorizeManage($thread, $actor, 'archive the thread');
+            MessagingPermissions::authorizeManage($thread, $actor, 'messages::messages.permissions.actions.archive-thread');
         }
 
         if ($thread->archived_at === null) {

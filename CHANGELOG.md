@@ -12,6 +12,11 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   `participateAs()`) instead of the literal `:participant` placeholder, in English and Slovak.
   A participant without a name reads as "An unnamed participant"; messages already stored render
   correctly too.
+- Permission refusals (`UnauthorizedMessagingAction`) now name the refused action and the required
+  role in the current locale, so a Slovak message no longer contains English phrases such as
+  "transfer ownership". They come from the new `messages::messages.permissions.actions.*` and
+  `messages::messages.permissions.roles.*` lines; a plain phrase passed to
+  `UnauthorizedMessagingAction::for()` / `requiresRole()` is still used as it is.
 
 ## 1.0.1 - 2026-10-04
 

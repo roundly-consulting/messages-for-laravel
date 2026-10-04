@@ -94,10 +94,10 @@ final class AddParticipant
             }
 
             if (! $data->thread->everyone_can_join) {
-                throw UnauthorizedMessagingAction::for($data->actor, 'join this thread');
+                throw UnauthorizedMessagingAction::for($data->actor, 'messages::messages.permissions.actions.join-thread');
             }
         } else {
-            MessagingPermissions::authorizeManage($data->thread, $data->actor, 'add participants');
+            MessagingPermissions::authorizeManage($data->thread, $data->actor, 'messages::messages.permissions.actions.add-participants');
         }
 
         if ($data->role !== null && $data->role !== ParticipantRole::Member) {

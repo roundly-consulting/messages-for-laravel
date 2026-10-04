@@ -28,7 +28,7 @@ final class DeleteMessage
             $thread = $message->thread;
 
             if (! $thread instanceof Thread) {
-                throw UnauthorizedMessagingAction::for($actor, 'delete this message');
+                throw UnauthorizedMessagingAction::for($actor, 'messages::messages.permissions.actions.delete-message');
             }
 
             MessagingPermissions::authorizeDeleteMessage($thread, $actor, $message);

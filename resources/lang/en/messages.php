@@ -16,6 +16,28 @@ return [
     'permissions' => [
         'unauthorized' => '[:actor] is not authorized to :action.',
         'requires-role' => '[:actor] requires the :role role to :action.',
+
+        // Fill :action above.
+        'actions' => [
+            'join-thread' => 'join this thread',
+            'send-messages' => 'send messages to this thread',
+            'add-participants' => 'add participants',
+            'remove-participants' => 'remove participants',
+            'remove-participant' => 'remove this participant',
+            'change-roles' => 'change participant roles',
+            'transfer-ownership' => 'transfer ownership',
+            'rename-thread' => 'rename the thread',
+            'archive-thread' => 'archive the thread',
+            'delete-message' => 'delete this message',
+            'edit-message' => 'edit this message',
+        ],
+
+        // Fill :role above.
+        'roles' => [
+            'owner' => 'owner',
+            'admin' => 'admin',
+            'member' => 'member',
+        ],
     ],
 
     'scope' => [

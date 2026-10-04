@@ -81,7 +81,7 @@ final class SendMessage
             ->exists();
 
         if (! $participates) {
-            throw UnauthorizedMessagingAction::for($data->sender, 'send messages to this thread');
+            throw UnauthorizedMessagingAction::for($data->sender, 'messages::messages.permissions.actions.send-messages');
         }
     }
 

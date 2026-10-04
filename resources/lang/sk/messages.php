@@ -14,8 +14,30 @@ return [
     ],
 
     'permissions' => [
-        'unauthorized' => '[:actor] nemá oprávnenie vykonať akciu „:action“.',
-        'requires-role' => '[:actor] potrebuje na akciu „:action“ rolu :role.',
+        'unauthorized' => '[:actor] nemá oprávnenie :action.',
+        'requires-role' => '[:actor] potrebuje rolu „:role“, ak chce :action.',
+
+        // Dopĺňajú :action vyššie.
+        'actions' => [
+            'join-thread' => 'pripojiť sa k tejto konverzácii',
+            'send-messages' => 'posielať správy do tejto konverzácie',
+            'add-participants' => 'pridávať účastníkov',
+            'remove-participants' => 'odoberať účastníkov',
+            'remove-participant' => 'odobrať tohto účastníka',
+            'change-roles' => 'meniť roly účastníkov',
+            'transfer-ownership' => 'odovzdať vlastníctvo',
+            'rename-thread' => 'premenovať konverzáciu',
+            'archive-thread' => 'archivovať konverzáciu',
+            'delete-message' => 'odstrániť túto správu',
+            'edit-message' => 'upraviť túto správu',
+        ],
+
+        // Dopĺňajú :role vyššie.
+        'roles' => [
+            'owner' => 'vlastník',
+            'admin' => 'správca',
+            'member' => 'člen',
+        ],
     ],
 
     'scope' => [

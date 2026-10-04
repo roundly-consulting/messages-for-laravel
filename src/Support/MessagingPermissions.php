@@ -101,6 +101,10 @@ final class MessagingPermissions
             && $thread->participationOf($actor) !== null;
     }
 
+    /**
+     * @param  string  $action  A `messages::messages.permissions.actions.*` key (or a plain
+     *                          phrase) naming the operation in the refusal.
+     */
     public static function authorizeManage(Thread $thread, Model $actor, string $action): void
     {
         if (! self::canManage($thread, $actor)) {
@@ -111,35 +115,35 @@ final class MessagingPermissions
     public static function authorizeRemove(Thread $thread, Model $actor, Participant $target): void
     {
         if (! self::canRemove($thread, $actor, $target)) {
-            throw UnauthorizedMessagingAction::for($actor, 'remove this participant');
+            throw UnauthorizedMessagingAction::for($actor, 'messages::messages.permissions.actions.remove-participant');
         }
     }
 
     public static function authorizeSetRole(Thread $thread, Model $actor): void
     {
         if (! self::canSetRoles($thread, $actor)) {
-            throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'change participant roles');
+            throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'messages::messages.permissions.actions.change-roles');
         }
     }
 
     public static function authorizeTransferOwnership(Thread $thread, Model $actor): void
     {
         if (! self::canTransferOwnership($thread, $actor)) {
-            throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'transfer ownership');
+            throw UnauthorizedMessagingAction::requiresRole($actor, ParticipantRole::Owner, 'messages::messages.permissions.actions.transfer-ownership');
         }
     }
 
     public static function authorizeDeleteMessage(Thread $thread, Model $actor, Message $message): void
     {
         if (! self::canDeleteMessage($thread, $actor, $message)) {
-            throw UnauthorizedMessagingAction::for($actor, 'delete this message');
+            throw UnauthorizedMessagingAction::for($actor, 'messages::messages.permissions.actions.delete-message');
         }
     }
 
     public static function authorizeEditMessage(Message $message, Model $actor): void
     {
         if (! self::canEditMessage($message, $actor)) {
-            throw UnauthorizedMessagingAction::for($actor, 'edit this message');
+            throw UnauthorizedMessagingAction::for($actor, 'messages::messages.permissions.actions.edit-message');
         }
     }
 

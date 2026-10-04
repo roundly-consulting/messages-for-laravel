@@ -28,7 +28,7 @@ final class RemoveParticipant
         $removesOther = $data->actor !== null && ! $this->isSelf($data);
 
         if ($removesOther) {
-            MessagingPermissions::authorizeManage($data->thread, $data->actor, 'remove participants');
+            MessagingPermissions::authorizeManage($data->thread, $data->actor, 'messages::messages.permissions.actions.remove-participants');
         }
 
         $participant = $data->thread
