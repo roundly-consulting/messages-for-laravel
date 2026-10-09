@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Actions;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
@@ -29,7 +28,14 @@ final class SendMessage
 
         // Create the message and bind its attachments atomically: a bad draft token (or any
         // attachment failure) rolls the whole send back, so no bodyless/orphan message is left.
-        $message = DB::transaction(function () use ($data, $meta): Message {
+        $message = $data->thread->getConnection()->transaction(function () use ($data, $meta): Message {
+            // The thread row is locked BEFORE the insert, not just by the pointer sync after it:
+            // on MySQL the sync's lookup is a locking read, and an uncommitted message inserted
+            // ahead of the lock would deadlock against another send holding it. Sends to one
+            // thread are serialised either way.
+            $threadQuery = $data->thread->newQueryWithoutScopes()->whereKey($data->thread->getKey());
+            $threadQuery->clone()->lockForUpdate()->first();
+
             /** @var Message $message */
             $message = $data->thread->messages()->create([
                 'parent_message_id' => $data->parentMessageId,
@@ -46,12 +52,16 @@ final class SendMessage
 
             // `latestMessage` is a belongsTo over `threads.last_message_id`, so it answers from
             // the thread instance's own attribute. The message's `created` hook has already
-            // written the pointer to the database — and a just-sent message is always the
-            // newest (stamped `now()`, greatest key), so that value is this message's id. The
-            // caller's `$data->thread` object still holds the pointer it was loaded with,
-            // though; catch it up with the same id, or `$thread->latestMessage` would report
-            // the thread as empty immediately after a successful send on it.
-            MessageModel::class()::applyLatestMessageTo($data->thread, $message->getKey());
+            // written the pointer to the database, but the caller's `$data->thread` object still
+            // holds the one it was loaded with; catch it up, or `$thread->latestMessage` would
+            // report the thread as empty right after a successful send on it. With the value the
+            // sync stored — still ours under the lock — not this message's id: a just-sent
+            // message is not the newest when the thread holds one stamped later (imported
+            // history, a skewed clock).
+            /** @var int|string|null $latest */
+            $latest = $threadQuery->clone()->value('last_message_id');
+
+            MessageModel::class()::applyLatestMessageTo($data->thread, $latest);
 
             return $message;
         });

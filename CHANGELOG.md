@@ -6,6 +6,14 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+### Fixed
+
+- A thread's latest message (`latestMessage`, the inbox preview) no longer ends on an older
+  message when two sends, or an unsend and a send, hit the same thread at once: the pointer is
+  now recomputed under the thread's row lock (on MySQL the lookup is a locking read too), and
+  sends to one thread are serialised. After a send, the thread you passed in now holds the
+  pointer the package stored rather than assuming the message just sent is the newest.
+
 ## 1.0.2 - 2026-10-04
 
 ### Fixed

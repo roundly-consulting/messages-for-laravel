@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Concerns;
 
+use Illuminate\Database\Connection;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\ThreadModel;
+use RoundlyConsulting\PackageToolkit\Enums\DatabaseDriver;
 
 /**
  * Keeps `messaging_threads.last_message_id` telling the truth.
@@ -90,35 +92,51 @@ trait MaintainsThreadLatestMessage
     public static function syncLatestMessageFor(int|string $threadId): int|string|null
     {
         $thread = ThreadModel::class();
+        $query = (new $thread)->newQueryWithoutScopes()->whereKey($threadId);
 
-        $latest = self::newestMessageIdIn($threadId);
+        // Lookup and write are one step under the thread's row lock. Without it two writers race:
+        // T1 computes m1 (T2's m2 is not committed yet), waits behind T2's write of m2, then
+        // overwrites it with the older m1 — the pointer ends on a message that is not the newest.
+        return $query->getConnection()->transaction(static function () use ($query, $threadId): int|string|null {
+            $query->clone()->lockForUpdate()->first();
 
-        // `toBase()` on purpose: this is bookkeeping, not a change to the thread. An Eloquent
-        // update would stamp `updated_at` — making every send, unsend and restore look like an
-        // edit of the thread itself — and would fire thread model events, which broadcast.
-        // `withTrashed()` because a soft-deleted thread's pointer must stay correct for when
-        // it is restored.
-        $thread::query()
-            ->withTrashed()
-            ->whereKey($threadId)
-            ->toBase()
-            ->update(['last_message_id' => $latest]);
+            $latest = self::newestMessageIdIn($threadId, locking: true);
 
-        return $latest;
+            // `toBase()` on purpose: this is bookkeeping, not a change to the thread. An Eloquent
+            // update would stamp `updated_at` — making every send, unsend and restore look like an
+            // edit of the thread itself — and would fire thread model events, which broadcast.
+            // No soft-delete scope because a soft-deleted thread's pointer must stay correct for
+            // when it is restored.
+            $query->clone()->toBase()->update(['last_message_id' => $latest]);
+
+            return $latest;
+        });
     }
 
     /**
      * The key of the thread's newest surviving message — `created_at` desc, then `id` desc, the
      * order "newest" means throughout the package — or null when it has none. Always asked of
      * the database, never of a Thread instance, whose own pointer may predate the latest send.
+     *
+     * `locking` is for a caller holding the thread lock: on MySQL (REPEATABLE READ) a plain read
+     * answers from the transaction's snapshot, which an earlier read — a host's own transaction
+     * included — may have taken before the lock was granted, so there the lookup is a locking
+     * read, which sees the latest committed rows. Postgres takes a fresh snapshot per statement,
+     * and a row lock there is a write to the row, so it stays a plain read.
      */
-    public static function newestMessageIdIn(int|string $threadId): int|string|null
+    public static function newestMessageIdIn(int|string $threadId, bool $locking = false): int|string|null
     {
+        $query = MessageModel::class()::query();
+        $connection = $query->getConnection();
+        $driver = $connection instanceof Connection ? DatabaseDriver::tryFrom($connection->getDriverName()) : null;
+        $snapshotRead = in_array($driver, [DatabaseDriver::Mysql, DatabaseDriver::Mariadb], true);
+
         /** @var int|string|null */
-        return MessageModel::class()::query()
+        return $query
             ->where('thread_id', $threadId)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
+            ->when($locking && $snapshotRead, static fn ($newest) => $newest->sharedLock())
             ->value('id');
     }
 

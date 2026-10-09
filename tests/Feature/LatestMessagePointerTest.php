@@ -9,7 +9,9 @@ use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Tests\Fixtures\QueryRecorder;
 use RoundlyConsulting\Messages\Tests\Models\User;
+use RoundlyConsulting\Testing\Database\DriverMatrix;
 
 /**
  * The denormalisation's own contract: what `threads.last_message_id` promises, who keeps it
@@ -142,4 +144,107 @@ it('refreshes both threads when a message moves between them', function (): void
 
     expect($from->fresh()?->latestMessage?->message)->toBe('stays')
         ->and($to->fresh()?->latestMessage?->message)->toBe('moves');
+});
+
+/**
+ * Two sends racing on one thread: each looks up the newest message, then writes it. Without a
+ * lock, T1 can compute its own message (T2's is not committed yet), wait behind T2's write, and
+ * then overwrite T2's newer answer with its older one — the pointer ends on m1 though m2 is
+ * newest, and an unsend racing a send ends the same way. One connection cannot block on its own
+ * lock, so this pins the guard instead of replaying the race: the thread row is locked, in a
+ * transaction that is still open, before the newest-message lookup runs.
+ */
+it('locks the thread row before it looks up the newest message', function (string $flow): void {
+    $user = User::create();
+    $thread = Messages::start('Hello')->withParticipant($user)->create();
+    $message = Messages::send($thread, $user, 'first');
+
+    if ($flow === 'restore') {
+        $message->delete();
+    }
+
+    $log = QueryRecorder::during(match ($flow) {
+        'send' => fn () => Messages::send($thread, $user, 'second'),
+        'unsend' => fn () => $message->delete(),
+        'restore' => fn () => $message->restore(),
+    });
+
+    $lookup = QueryRecorder::first($log, static fn (string $sql): bool => str_starts_with($sql, 'select')
+        && str_contains($sql, 'from messaging_messages ')
+        && str_contains($sql, 'order by created_at desc'));
+
+    expect($lookup)->not->toBeNull()
+        ->and(QueryRecorder::lockHeldAt($log, (int) $lookup, 'messaging_threads'))->toBeTrue();
+})->with(['send', 'unsend', 'restore']);
+
+/**
+ * On MySQL (REPEATABLE READ) a plain read inside a transaction answers from a snapshot that may
+ * predate the thread lock — taken by an earlier read in the same transaction, a host's own
+ * transaction included — so the lookup must be a locking read, which always sees the latest
+ * committed rows. Postgres reads a fresh snapshot per statement and needs no lock there.
+ *
+ * The suite has no MySQL engine, so this runs the lookup on the in-memory connection with its
+ * driver reported as mysql — the only thing the decision reads.
+ */
+it('makes the newest-message lookup a locking read on mysql', function (): void {
+    $user = User::create();
+    $thread = Messages::start('Hello')->withParticipant($user)->create();
+    Messages::send($thread, $user, 'first');
+
+    $log = QueryRecorder::during(function () use ($thread): void {
+        $connection = DB::connection();
+        $config = new ReflectionProperty($connection, 'config');
+        $original = $config->getValue($connection);
+        $config->setValue($connection, ['driver' => 'mysql'] + $original);
+
+        try {
+            Message::syncLatestMessageFor($thread->getKey());
+        } finally {
+            $config->setValue($connection, $original);
+        }
+    });
+
+    $lookup = QueryRecorder::first($log, static fn (string $sql): bool => str_contains($sql, 'from messaging_messages ')
+        && str_contains($sql, 'order by created_at desc'));
+
+    expect($lookup)->not->toBeNull()
+        ->and(QueryRecorder::locksShared($log[(int) $lookup]['sql']))->toBeTrue()
+        ->and(QueryRecorder::lockHeldAt($log, (int) $lookup, 'messaging_threads'))->toBeTrue();
+})->skip(fn (): bool => DriverMatrix::driver() !== 'sqlite', 'reports the in-memory connection as mysql');
+
+/** ...and nowhere else: a Postgres row lock is a write to the row, for no gain at READ COMMITTED. */
+it('keeps the newest-message lookup a plain read off mysql', function (): void {
+    $user = User::create();
+    $thread = Messages::start('Hello')->withParticipant($user)->create();
+    Messages::send($thread, $user, 'first');
+
+    $log = QueryRecorder::during(fn () => Message::syncLatestMessageFor($thread->getKey()));
+
+    $lookup = QueryRecorder::first($log, static fn (string $sql): bool => str_contains($sql, 'from messaging_messages ')
+        && str_contains($sql, 'order by created_at desc'));
+
+    expect($lookup)->not->toBeNull()
+        ->and(QueryRecorder::locksShared($log[(int) $lookup]['sql']))->toBeFalse();
+})->skip(fn (): bool => in_array(DriverMatrix::driver(), ['mysql', 'mariadb'], true), 'mysql locks the lookup on purpose');
+
+/**
+ * "A just-sent message is the newest" is false for a thread holding a message stamped later
+ * than now — imported history, a skewed clock. The sync computes the real newest; the caller's
+ * thread must be told that answer, not the id of the message just sent.
+ */
+it('leaves the caller thread at the pointer the sync computed', function (): void {
+    $user = User::create();
+    $thread = Messages::start('Hello')->withParticipant($user)->create();
+
+    $later = Message::factory()->inThread($thread)->create(['message' => 'stamped later']);
+    $later->forceFill(['created_at' => now()->addHour()])->saveQuietly();
+    Message::syncLatestMessageFor($thread->getKey());
+
+    Messages::send($thread, $user, 'sent now');
+
+    $stored = DB::table('messaging_threads')->where('id', $thread->getKey())->value('last_message_id');
+
+    expect($stored)->toEqual($later->getKey())
+        ->and($thread->last_message_id)->toEqual($stored)
+        ->and($thread->latestMessage?->message)->toBe('stamped later');
 });
