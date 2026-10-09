@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
@@ -120,4 +121,31 @@ it('builds the cross-thread reply exception with a translated message', function
 it('resolves the message model for parent and replies relations', function () {
     expect((new Message)->parent())->toBeInstanceOf(BelongsTo::class)
         ->and((new Message)->replies())->toBeInstanceOf(HasMany::class);
+});
+
+/**
+ * A connection with `PDO::ATTR_STRINGIFY_FETCHES` on (a `database.connections.*.options`
+ * setting) hands every column back as a string, while the key Eloquent casts stays an int. A
+ * strict comparison of the two refused a reply to a message of the very same thread.
+ */
+it('accepts a same-thread reply on a connection that fetches strings', function () {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+    $parent = Messages::send($thread, $user, 'original');
+
+    $pdo = DB::connection()->getPdo();
+    $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, true);
+
+    try {
+        $reply = app(SendMessage::class)->execute(new SendMessageData(
+            thread: $thread,
+            sender: $user,
+            body: 'reply',
+            parentMessageId: $parent->getKey(),
+        ));
+    } finally {
+        $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
+    }
+
+    expect($reply->meta['quote']['excerpt'])->toBe('original');
 });

@@ -13,6 +13,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   now recomputed under the thread's row lock (on MySQL the lookup is a locking read too), and
   sends to one thread are serialised. After a send, the thread you passed in now holds the
   pointer the package stored rather than assuming the message just sent is the newest.
+- On a connection that fetches every column as a string (`PDO::ATTR_STRINGIFY_FETCHES`), a reply
+  to a message of the same thread is no longer refused as a cross-thread reply, and a message
+  holding its thread in memory keeps that thread's latest-message pointer current.
 
 ## 1.0.2 - 2026-10-04
 

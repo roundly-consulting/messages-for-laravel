@@ -75,9 +75,10 @@ trait MaintainsThreadLatestMessage
 
             // If this message already holds its thread in memory, keep that instance honest
             // too — otherwise the caller's own object would answer from a pointer that was
-            // true when it was loaded and is not any more.
+            // true when it was loaded and is not any more. Compared as strings: `thread_id` is
+            // not cast, so a connection fetching strings hands back '1' for the int key 1.
             if ($this->relationLoaded('thread') && $this->thread instanceof Thread
-                && $this->thread->getKey() === $threadId) {
+                && (string) $this->thread->getKey() === (string) $threadId) {
                 self::applyLatestMessageTo($this->thread, $latest);
             }
         }

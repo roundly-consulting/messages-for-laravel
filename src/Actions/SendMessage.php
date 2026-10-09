@@ -133,7 +133,9 @@ final class SendMessage
             throw MessageException::replyAcrossThreads();
         }
 
-        if ($parent->thread_id !== $data->thread->getKey()) {
+        // As strings: `thread_id` is not cast, so a connection fetching strings returns '1'
+        // where the thread's cast key is the int 1.
+        if ((string) $parent->thread_id !== (string) $data->thread->getKey()) {
             throw MessageException::replyAcrossThreads();
         }
 

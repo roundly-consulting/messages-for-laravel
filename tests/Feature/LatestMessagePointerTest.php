@@ -248,3 +248,23 @@ it('leaves the caller thread at the pointer the sync computed', function (): voi
         ->and($thread->last_message_id)->toEqual($stored)
         ->and($thread->latestMessage?->message)->toBe('stamped later');
 });
+
+/** The same string-fetching connection left a held thread on the deleted message's id. */
+it('keeps a held thread honest on a connection that fetches strings', function (): void {
+    $user = User::create();
+    $thread = Messages::start('Hello')->withParticipant($user)->create();
+    Messages::send($thread, $user, 'only');
+
+    $pdo = DB::connection()->getPdo();
+    $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, true);
+
+    try {
+        $message = Message::query()->with('thread')->firstOrFail();
+        $message->delete();
+    } finally {
+        $pdo->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
+    }
+
+    expect(DB::table('messaging_threads')->where('id', $thread->getKey())->value('last_message_id'))->toBeNull()
+        ->and($message->thread?->last_message_id)->toBeNull();
+});
