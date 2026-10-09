@@ -50,6 +50,9 @@ final class RemoveParticipant
 
         $participant->delete();
 
+        // A loaded relation would still answer `participationOf()` with the removed row.
+        $data->thread->unsetRelation('participants');
+
         $data->thread->touch('last_activity_at');
 
         Event::dispatch(new ParticipantLeft($data->thread, $data->participant));

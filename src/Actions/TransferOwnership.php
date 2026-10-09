@@ -29,7 +29,7 @@ final class TransferOwnership
             throw ParticipationException::directThreadHasNoRoles();
         }
 
-        return $thread->getConnection()->transaction(function () use ($thread, $currentOwner, $newOwner): Participant {
+        $owner = $thread->getConnection()->transaction(function () use ($thread, $currentOwner, $newOwner): Participant {
             // Serialised per thread, as adds are: two transfers at once must not both read the
             // same owner and leave two.
             $thread->newQueryWithoutScopes()->whereKey($thread->getKey())->lockForUpdate()->first();
@@ -52,6 +52,11 @@ final class TransferOwnership
 
             return $next;
         });
+
+        // A loaded relation would still answer `participationOf()` with the old roles.
+        $thread->unsetRelation('participants');
+
+        return $owner;
     }
 
     private function participantFor(Thread $thread, Model $model): Participant

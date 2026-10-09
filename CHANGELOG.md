@@ -42,6 +42,12 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   `meta.edited_at`, and `edited_at` reads that. Messages edited before this release carry no
   marker and report `edited_at` as `null`; a published resource needs the same `editedAt()` change
   (copy it from the package's `MessageResource`).
+- Permission checks no longer trust a stale or trashed `participants` relation. On a thread
+  instance whose participants were already loaded, a participant removed, demoted or no longer
+  owner could still rename, archive or change roles, and a host loading the relation
+  `withTrashed()` let someone who had left manage the thread. `Thread::participationOf()` now
+  ignores trashed rows, and adding, removing, re-roling and transferring ownership drop the loaded
+  relation.
 
 ## 1.0.2 - 2026-10-04
 

@@ -49,6 +49,9 @@ final class SetParticipantRole
 
         $participant->forceFill(['role' => $data->role])->save();
 
+        // A loaded relation would still answer `participationOf()` with the old role.
+        $data->thread->unsetRelation('participants');
+
         return $participant;
     }
 }

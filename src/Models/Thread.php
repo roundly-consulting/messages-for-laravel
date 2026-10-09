@@ -295,12 +295,20 @@ class Thread extends Model
         return $this->participationOf($participant)?->role;
     }
 
-    /** The model's (active) participant row in this thread, or null if it is not in it. */
+    /**
+     * The model's (active) participant row in this thread, or null if it is not in it.
+     *
+     * A loaded `participants` relation answers without a query — the inbox eager-loads it — but
+     * only from its active rows: a host may load it `withTrashed()`, and someone who left is not
+     * in the thread. The package's own membership writes drop the relation, so it never answers
+     * from before them.
+     */
     public function participationOf(Model $participant): ?Participant
     {
         if ($this->relationLoaded('participants')) {
             return $this->participants
-                ->first(fn (Participant $p): bool => (string) $p->participant_id === (string) $participant->getKey()
+                ->first(fn (Participant $p): bool => ! $p->trashed()
+                    && (string) $p->participant_id === (string) $participant->getKey()
                     && $p->participant_type === $participant->getMorphClass());
         }
 

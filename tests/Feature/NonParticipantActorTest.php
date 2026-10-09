@@ -94,3 +94,70 @@ it('refuses an actor deleting a message whose thread is gone', function (): void
 
     Messages::message($message->fresh())->delete(by: $a);
 })->throws(UnauthorizedMessagingAction::class);
+
+/**
+ * `participationOf()` answers from a loaded `participants` relation, and nothing the package
+ * wrote refreshed it: on the instance a host had read `$thread->participants` from, a removed
+ * admin could still archive, a demoted one still rename, and an old owner still hand out roles.
+ */
+describe('a thread instance with its participants loaded', function (): void {
+    beforeEach(function (): void {
+        config()->set('messages.permissions.enabled', true);
+
+        $this->owner = User::create();
+        $this->admin = User::create();
+        $this->thread = Messages::start('Crew')->withParticipants([$this->owner, $this->admin])->create();
+        $this->participants = Messages::thread($this->thread)->participants();
+        $this->participants->setRole($this->admin, ParticipantRole::Admin, by: $this->owner);
+
+        $this->thread->load('participants');
+    });
+
+    it('refuses an admin removed since', function (): void {
+        $this->participants->remove($this->admin, by: $this->owner);
+
+        expect(fn () => Messages::thread($this->thread)->archive(by: $this->admin))
+            ->toThrow(UnauthorizedMessagingAction::class);
+
+        expect($this->thread->fresh()->isArchived())->toBeFalse();
+    });
+
+    it('refuses an admin demoted since', function (): void {
+        $this->participants->setRole($this->admin, ParticipantRole::Member, by: $this->owner);
+
+        expect(fn () => Messages::thread($this->thread)->rename('Taken', by: $this->admin))
+            ->toThrow(UnauthorizedMessagingAction::class);
+    });
+
+    it('refuses an owner who has handed ownership on', function (): void {
+        $member = User::create();
+        $this->participants->add($member);
+        $this->participants->transferOwnership(from: $this->owner, to: $this->admin);
+
+        expect(fn () => $this->participants->setRole($member, ParticipantRole::Admin, by: $this->owner))
+            ->toThrow(UnauthorizedMessagingAction::class);
+    });
+
+    it('knows a participant added since', function (): void {
+        $carol = User::create();
+        $this->participants->add($carol);
+
+        expect($this->thread->roleOf($carol))->toBe(ParticipantRole::Member);
+    });
+});
+
+it('ignores trashed rows a host loaded with the participants', function (): void {
+    config()->set('messages.permissions.enabled', true);
+    $owner = User::create();
+    $admin = User::create();
+    $thread = Messages::start('Crew')->withParticipants([$owner, $admin])->create();
+    $participants = Messages::thread($thread)->participants();
+    $participants->setRole($admin, ParticipantRole::Admin, by: $owner);
+    $participants->remove($admin, by: $owner);
+
+    $loaded = Thread::query()->with(['participants' => fn ($query) => $query->withTrashed()])->findOrFail($thread->getKey());
+
+    expect($loaded->participationOf($admin))->toBeNull()
+        ->and($loaded->canManage($admin))->toBeFalse()
+        ->and(fn () => Messages::thread($loaded)->rename('pwned', by: $admin))->toThrow(UnauthorizedMessagingAction::class);
+});

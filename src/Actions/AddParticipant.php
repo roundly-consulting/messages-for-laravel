@@ -69,6 +69,9 @@ final class AddParticipant
             return $participant;
         }
 
+        // A loaded relation would answer `participationOf()` from before this add.
+        $data->thread->unsetRelation('participants');
+
         $data->thread->touch('last_activity_at');
 
         Event::dispatch(new ParticipantJoined($participant));
