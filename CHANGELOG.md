@@ -6,6 +6,15 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+### Added
+
+- A `{type}` placeholder for `messages.broadcasting.threads.per-participant-channel`: the
+  participant's full morph type, lowercased with `\` as `.` (e.g.
+  `messaging.participant.{type}.{id}` → `private-messaging.participant.app.models.admin.user.5`).
+  `{name}` (the class basename) is unchanged, but without a morph map two models sharing a basename
+  (`App\Models\User` and `App\Models\Admin\User`) share a `{name}` channel and hear each other's
+  new threads — switch to `{type}` (and update `routes/channels.php`) or register a morph map.
+
 ### Fixed
 
 - A thread's latest message (`latestMessage`, the inbox preview) no longer ends on an older

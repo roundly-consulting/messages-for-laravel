@@ -11,6 +11,7 @@ use RoundlyConsulting\Messages\Events\ThreadCreated;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Tests\Models\Admin\User as AdminUser;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 /**
@@ -104,4 +105,34 @@ it('creates the thread and its participants atomically', function () {
         ->and(Participant::query()->withTrashed()->count())->toBe(0)
         ->and($dispatched)->toBeFalse()
         ->and($this->threadBroadcasts)->toBe([]);
+});
+
+/**
+ * `{name}` is the participant's class basename, so without a morph map `App\Models\User` 5 and
+ * `App\Models\Admin\User` 5 shared one channel and each heard the other's new threads. The
+ * opt-in `{type}` placeholder is the full morph type, made channel-safe.
+ */
+it('tells same-basename participants apart on the {type} channel', function () {
+    config()->set('messages.broadcasting.threads.per-participant-channel', 'messaging.participant.{type}.{id}');
+    $admin = AdminUser::create();
+
+    expect($admin->getKey())->toBe($this->alice->getKey());
+
+    Messages::start('Secret')->private()->withParticipants([$this->alice, $admin])->create();
+
+    expect($this->threadBroadcasts[0]['channels'])->toBe([
+        'private-messaging.participant.roundlyconsulting.messages.tests.models.user.'.$this->alice->getKey(),
+        'private-messaging.participant.roundlyconsulting.messages.tests.models.admin.user.'.$admin->getKey(),
+    ]);
+});
+
+it('keeps the {name} channel as it was', function () {
+    $admin = AdminUser::create();
+
+    Messages::start('Secret')->private()->withParticipants([$this->alice, $admin])->create();
+
+    expect($this->threadBroadcasts[0]['channels'])->toBe([
+        'private-messaging.participant.user.'.$this->alice->getKey(),
+        'private-messaging.participant.user.'.$admin->getKey(),
+    ]);
 });

@@ -401,12 +401,18 @@ class Thread extends Model
         // A fresh query, never `$this->participants`: this runs whenever the model event fires,
         // and loading the relation here would cache whatever the thread held at that moment on
         // the instance the caller keeps using.
+        //
+        // `{name}` is the lowercased class basename, so without a morph map two classes sharing a
+        // basename (`App\Models\User`, `App\Models\Admin\User`) share a channel. `{type}` is the
+        // full morph type, lowercased with `\` as `.` (channel names allow no backslash) — the
+        // alias itself under a morph map.
         return $this->participants()
             ->get()
             ->map(fn (Participant $participant): PrivateChannel => new PrivateChannel(str_replace(
-                search: ['{name}', '{id}'],
+                search: ['{name}', '{type}', '{id}'],
                 replace: [
                     str($participant->participant_type)->classBasename()->lower()->toString(),
+                    str($participant->participant_type)->replace('\\', '.')->lower()->toString(),
                     (string) $participant->participant_id,
                 ],
                 subject: $template,

@@ -149,6 +149,10 @@ return [
 
         'threads' => [
             'public-channel' => 'messaging',
+            // {name} = the participant's lowercased class basename, {id} = its key. Without a
+            // morph map, two classes sharing a basename (App\Models\User, App\Models\Admin\User)
+            // share a {name} channel — use {type} (the full morph type, lowercased, "\" as ".")
+            // or a morph map to keep them apart.
             'per-participant-channel' => 'messaging.participant.{name}.{id}',
             'events' => [
                 'created' => 'messaging.thread.created',
