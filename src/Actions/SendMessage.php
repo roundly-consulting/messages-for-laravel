@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Actions;
 
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Str;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Events\MessageSent;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
 use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessageModel;
-use RoundlyConsulting\Messages\Support\MessagesConfig;
 
 final class SendMessage
 {
@@ -143,7 +141,8 @@ final class SendMessage
             'id' => $parent->getKey(),
             'sender_id' => $parent->sender_id,
             'sender_type' => $parent->sender_type,
-            'excerpt' => Str::limit($parent->message, MessagesConfig::previewLength()),
+            // The preview, not the raw body: a system message's body is a translation key.
+            'excerpt' => $parent->preview(),
         ];
 
         return $meta;

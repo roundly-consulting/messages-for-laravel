@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Messages\Actions\SendMessage;
 use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
+use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Exceptions\MessageException;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Http\Resources\MessageResource;
 use RoundlyConsulting\Messages\MessagesManager;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -148,4 +151,25 @@ it('accepts a same-thread reply on a connection that fetches strings', function 
     }
 
     expect($reply->meta['quote']['excerpt'])->toBe('original');
+});
+
+/**
+ * A system message stores a translation key as its body; the quote snapshot copied that key
+ * raw, so the reply quoted `messages::messages.system.participant_joined`. It quotes what the
+ * thread shows for that message — its preview.
+ */
+it('quotes a system message as it reads, not as its translation key', function () {
+    config()->set('messages.system-messages.enabled', true);
+    $alice = User::create();
+    $bob = User::create();
+    $thread = Messages::start('Chat')->withParticipant($alice)->create();
+    Messages::thread($thread)->participants()->add($bob);
+
+    $joined = Message::query()->where('type', MessageType::System->value)->latest('id')->firstOrFail();
+
+    $reply = Messages::to($thread)->from($alice)->replyingTo($joined)->send('welcome!');
+
+    expect($reply->meta['quote']['excerpt'])->toBe($joined->preview())
+        ->not->toContain('messages::')
+        ->and(MessageResource::make($reply)->toArray(Request::create('/'))['reply_to']['excerpt'])->toBe($joined->preview());
 });

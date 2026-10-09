@@ -16,6 +16,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - On a connection that fetches every column as a string (`PDO::ATTR_STRINGIFY_FETCHES`), a reply
   to a message of the same thread is no longer refused as a cross-thread reply, and a message
   holding its thread in memory keeps that thread's latest-message pointer current.
+- A reply to a system message (a join, leave or rename notice) now quotes the notice as it reads
+  ("Anna joined the conversation.") instead of its raw translation key, in `meta.quote.excerpt`
+  and in `MessageResource`'s `reply_to.excerpt`.
 
 ## 1.0.2 - 2026-10-04
 
