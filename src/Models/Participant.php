@@ -179,7 +179,9 @@ class Participant extends Model
      */
     public function broadcastOn($event): PrivateChannel|array
     {
-        if (! Config::boolean('messages.broadcasting.enabled')) {
+        // A soft delete fires `trashed` and then `deleted`, and both broadcast: `trashed` speaks
+        // for it, so `deleted` goes out for a force delete only.
+        if (! Config::boolean('messages.broadcasting.enabled') || ($event === 'deleted' && ! $this->isForceDeleting())) {
             return [];
         }
 

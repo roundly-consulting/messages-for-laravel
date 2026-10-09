@@ -33,6 +33,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - `Participant::hasUnread()` on a participation of a soft-deleted thread now returns `false`
   instead of crashing, and `Participant::markAsRead()` there throws
   `ParticipationException::threadMissing()` (English and Slovak) instead of a `TypeError`.
+- An unsend and a leave are broadcast once (`messaging.message.unsent`,
+  `messaging.participant.left`) instead of twice: a soft delete fires both the `trashed` and the
+  `deleted` model event, and the `deleted` broadcast now goes out for a force delete only.
 
 ## 1.0.2 - 2026-10-04
 
