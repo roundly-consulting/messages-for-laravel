@@ -63,3 +63,40 @@ it('limits pruning to a single thread', function () {
 
     Carbon::setTestNow();
 });
+
+/**
+ * `--days=0` / `--days=-1` pruned everything (the cutoff at or after now), `--days=ten`
+ * silently used the configured window, and `--days=1.9` silently meant 1. Each is refused,
+ * naming the option, before anything is deleted.
+ */
+it('refuses a --days value that is not a whole number of at least 1', function (string $days) {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+
+    Carbon::setTestNow(Carbon::now()->subDays(100));
+    Messages::send($thread, $user, 'old');
+    Carbon::setTestNow();
+    Messages::send($thread, $user, 'fresh');
+
+    $this->artisan('messages:prune', ['--days' => $days])
+        ->expectsOutputToContain('--days')
+        ->assertFailed();
+
+    expect(Message::query()->withTrashed()->count())->toBe(2);
+})->with(['0', '-1', 'ten', '1.9', '']);
+
+it('accepts --days=1', function () {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+
+    Carbon::setTestNow(Carbon::now()->subDays(2));
+    Messages::send($thread, $user, 'old');
+    Carbon::setTestNow();
+    Messages::send($thread, $user, 'fresh');
+
+    $this->artisan('messages:prune', ['--days' => '1'])
+        ->expectsOutputToContain('Pruned 1 message(s) older than 1 day(s).')
+        ->assertSuccessful();
+
+    expect(Message::query()->pluck('message')->all())->toBe(['fresh']);
+});

@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
 use RoundlyConsulting\Messages\Actions\PruneMessages;
 use RoundlyConsulting\Messages\Builders\PendingMessage;
@@ -165,6 +166,8 @@ class MessagesManager
     /**
      * Permanently delete messages older than the retention window (`messages.prune.days`
      * when omitted), optionally in one thread only. Returns how many were removed.
+     *
+     * @throws InvalidArgumentException for a window below one day, before anything is deleted
      */
     public function prune(?int $days = null, ?Thread $thread = null): int
     {

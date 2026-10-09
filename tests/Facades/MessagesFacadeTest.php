@@ -283,6 +283,24 @@ it('prunes with the configured retention by default', function (): void {
         ->and($this->crew->messages()->pluck('message')->all())->toBe(['fresh']);
 });
 
+/**
+ * A window below one day puts the cutoff at or after now: `prune(0)` deleted everything older
+ * than this second, `prune(-1)` everything sent so far, attachment files included. The config
+ * path already refused such a window; the explicit argument bypassed it.
+ */
+it('refuses a prune window below one day before deleting anything', function (int $days): void {
+    $this->travelTo(now()->subHour());
+    Messages::send($this->crew, $this->alice, 'an hour old');
+    $this->travelBack();
+    Messages::send($this->crew, $this->alice, 'just now');
+
+    expect(fn () => Messages::prune(days: $days))
+        ->toThrow(InvalidArgumentException::class, 'at least 1 day');
+
+    expect(Message::query()->withTrashed()->count())->toBe(2)
+        ->and(Messages::prune(days: 1))->toBe(0);
+})->with([0, -1]);
+
 it('resolves the manager by dependency injection and runs the same code', function (): void {
     $manager = app(MessagesManager::class);
 

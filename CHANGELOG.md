@@ -22,6 +22,11 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - A reply to an unsent message of the same thread is still refused, but now with
   `MessageException::alreadyDeleted()` instead of the misleading "a reply must target a message in
   the same thread".
+- `messages:prune` now refuses a `--days` value that is not a whole number of at least 1 and exits
+  with an error before deleting anything. `--days=0` and `--days=-1` used to delete every message
+  (attachment files included), and `--days=ten` / `--days=1.9` silently ran with the configured
+  window / 1 day. Likewise `Messages::prune()` (and the `PruneMessages` action) now throws
+  `InvalidArgumentException` for a window below one day instead of deleting everything.
 
 ## 1.0.2 - 2026-10-04
 

@@ -17,8 +17,22 @@ final class PruneMessagesCommand extends Command
 
     public function handle(PruneMessages $pruneMessages): int
     {
-        $days = $this->option('days');
-        $days = is_numeric($days) ? (int) $days : MessagesConfig::pruneDays();
+        $option = $this->option('days');
+
+        // A whole number of at least 1, or nothing (the configured window). `--days=0` / `-1`
+        // put the cutoff at or after now — every message — and `ten` / `1.9` used to read as the
+        // default / 1 without a word.
+        $days = $option === null
+            ? MessagesConfig::pruneDays()
+            : filter_var($option, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        if ($days === false) {
+            $given = is_scalar($option) ? (string) $option : get_debug_type($option);
+
+            $this->error("The --days option must be a whole number of at least 1, [{$given}] given.");
+
+            return self::FAILURE;
+        }
 
         // A thread id is a string off the CLI but an int when the key type is bigint and the
         // command is called programmatically (`Artisan::call`, a test). `is_string()` alone

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Actions;
 
 use Illuminate\Database\Eloquent\Builder;
+use InvalidArgumentException;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessageModel;
@@ -14,9 +15,16 @@ final class PruneMessages
 {
     /**
      * Force-delete messages older than the cutoff. Returns the number removed.
+     *
+     * @throws InvalidArgumentException for a window below one day, which would put the cutoff
+     *                                  at or after now and delete every message
      */
     public function execute(PruneMessagesData $data): int
     {
+        if ($data->days < 1) {
+            throw new InvalidArgumentException("Messages are pruned after at least 1 day, [{$data->days}] given.");
+        }
+
         $model = MessageModel::class();
 
         $cutoff = now()->subDays($data->days);
