@@ -53,6 +53,12 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   without participants — now becomes its owner instead of a member, so the thread stays manageable.
   Removing a participant now takes the same per-thread lock as adding one, so a join racing the
   owner's departure cannot end ownerless either.
+- **Behaviour change:** a direct thread no longer takes new participants once it exists.
+  `participants()->add()` on a DM — by a participant or a trusted caller without `by:`, and for
+  someone who left as well — now throws `ParticipationException::directThreadIsClosed()` (English
+  and Slovak). Any DM participant could add a third person, who then read the pair's whole history
+  in a thread that still answered as their DM. Start a group thread to bring someone in; adding
+  someone already in the DM still returns their row.
 
 ## 1.0.2 - 2026-10-04
 

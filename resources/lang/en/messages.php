@@ -10,6 +10,7 @@ return [
         'owner-must-transfer' => 'The owner must transferOwnership() before leaving the thread.',
         'not-the-owner' => '[:participant] does not own this thread, so has no ownership to transfer.',
         'direct-has-no-roles' => 'A direct thread has no roles to change.',
+        'direct-is-closed' => 'A direct thread takes no new participants; start a group thread to bring someone in.',
         'participant-missing' => 'The model behind participant [:participant] no longer exists.',
         'thread-missing' => 'The thread of participant [:participant] no longer exists.',
     ],

@@ -54,6 +54,7 @@ final class StartThread
                     thread: $thread,
                     participant: $participant,
                     role: $this->roleForIndex($data, $index),
+                    creatingThread: true,
                 ));
             }
         });

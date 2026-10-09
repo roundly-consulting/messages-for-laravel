@@ -22,6 +22,9 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
  * existing row back, unchanged (no event, no system message, no role change; use
  * {@see SetParticipantRole} for that).
  *
+ * A direct thread takes no new participants once it exists — from anyone, trusted callers
+ * included; only {@see StartThread} seats its two.
+ *
  * With an actor:
  *  - adding **yourself** is a join, allowed only on a thread with `everyone_can_join` (direct
  *    threads never are); a member who joins again is a no-op;
@@ -56,6 +59,13 @@ final class AddParticipant
 
             if ($existing instanceof Participant) {
                 return $existing;
+            }
+
+            // A direct thread is the two of them: anyone else let in would read their whole
+            // history in a thread that still answers as their DM. It takes participants only
+            // while StartThread creates it — bringing someone in means starting a group.
+            if ($data->thread->is_direct && ! $data->creatingThread) {
+                throw ParticipationException::directThreadIsClosed();
             }
 
             /** @var Participant */

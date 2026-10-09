@@ -10,6 +10,7 @@ return [
         'owner-must-transfer' => 'Vlastník musí pred opustením konverzácie odovzdať vlastníctvo cez transferOwnership().',
         'not-the-owner' => '[:participant] nie je vlastníkom tejto konverzácie, preto nemôže vlastníctvo odovzdať.',
         'direct-has-no-roles' => 'Priama konverzácia nemá žiadne roly, ktoré by bolo možné zmeniť.',
+        'direct-is-closed' => 'Do priamej konverzácie nemožno pridať ďalších účastníkov. Ak chcete niekoho prizvať, začnite skupinovú konverzáciu.',
         'participant-missing' => 'Model účastníka [:participant] už neexistuje.',
         'thread-missing' => 'Konverzácia účastníka [:participant] už neexistuje.',
     ],
