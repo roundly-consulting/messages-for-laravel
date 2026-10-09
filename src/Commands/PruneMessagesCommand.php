@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Messages\Commands;
 
 use Illuminate\Console\Command;
-use RoundlyConsulting\Messages\Actions\PruneMessages;
-use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
+use RoundlyConsulting\Messages\MessagesManager;
+use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessagesConfig;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 final class PruneMessagesCommand extends Command
 {
@@ -15,7 +16,11 @@ final class PruneMessagesCommand extends Command
 
     protected $description = 'Permanently delete messages older than the retention window';
 
-    public function handle(PruneMessages $pruneMessages): int
+    /**
+     * Through the manager, like every other path, so `Messages::fake()` records a console or
+     * scheduled prune and host overrides of the action apply.
+     */
+    public function handle(MessagesManager $messages): int
     {
         $option = $this->option('days');
 
@@ -37,17 +42,28 @@ final class PruneMessagesCommand extends Command
         // A thread id is a string off the CLI but an int when the key type is bigint and the
         // command is called programmatically (`Artisan::call`, a test). `is_string()` alone
         // silently dropped the filter and pruned EVERY thread.
-        $thread = $this->option('thread');
+        $threadOption = $this->option('thread');
         $threadId = match (true) {
-            is_string($thread) && $thread !== '' => $thread,
-            is_int($thread) => $thread,
+            is_string($threadOption) && $threadOption !== '' => $threadOption,
+            is_int($threadOption) => $threadOption,
             default => null,
         };
 
-        $deleted = $pruneMessages->execute(new PruneMessagesData(
-            days: $days,
-            threadId: $threadId,
-        ));
+        $thread = null;
+
+        if ($threadId !== null) {
+            // With the trashed ones: a soft-deleted thread's messages are still prunable. An id
+            // that names no thread is refused — a null thread would prune every thread.
+            $thread = ThreadModel::class()::query()->withTrashed()->find($threadId);
+
+            if (! $thread instanceof Thread) {
+                $this->error("No thread with id [{$threadId}] exists.");
+
+                return self::FAILURE;
+            }
+        }
+
+        $deleted = $messages->prune($days, $thread);
 
         $this->info("Pruned {$deleted} message(s) older than {$days} day(s).");
 

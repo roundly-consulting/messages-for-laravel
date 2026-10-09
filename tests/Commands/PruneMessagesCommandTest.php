@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
+use RoundlyConsulting\Messages\Enums\MessagingOperation;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -99,4 +100,43 @@ it('accepts --days=1', function () {
         ->assertSuccessful();
 
     expect(Message::query()->pluck('message')->all())->toBe(['fresh']);
+});
+
+/**
+ * The command resolved the prune action itself, so `Messages::fake()` never saw a scheduled or
+ * console prune and `assertPruned()` failed. It goes through the manager like every other path.
+ */
+it('is recorded by the fake', function () {
+    $fake = Messages::fake();
+
+    $this->artisan('messages:prune', ['--days' => 30])->assertSuccessful();
+
+    $fake->assertPruned(30);
+    expect($fake->recorded(MessagingOperation::Prune)[0]->thread)->toBeNull();
+});
+
+it('records the thread it was limited to', function () {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+    $fake = Messages::fake();
+
+    $this->artisan('messages:prune', ['--days' => 30, '--thread' => (string) $thread->getKey()])->assertSuccessful();
+
+    $fake->assertPruned(30);
+    expect($fake->recorded(MessagingOperation::Prune)[0]->thread?->is($thread))->toBeTrue();
+});
+
+it('refuses an unknown --thread instead of pruning every thread', function () {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+
+    Carbon::setTestNow(Carbon::now()->subDays(100));
+    Messages::send($thread, $user, 'old');
+    Carbon::setTestNow();
+
+    $this->artisan('messages:prune', ['--days' => 30, '--thread' => 999_999])
+        ->expectsOutputToContain('999999')
+        ->assertFailed();
+
+    expect(Message::query()->withTrashed()->count())->toBe(1);
 });

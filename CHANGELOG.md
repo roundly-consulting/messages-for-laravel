@@ -27,6 +27,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   (attachment files included), and `--days=ten` / `--days=1.9` silently ran with the configured
   window / 1 day. Likewise `Messages::prune()` (and the `PruneMessages` action) now throws
   `InvalidArgumentException` for a window below one day instead of deleting everything.
+- `messages:prune` now runs through `MessagesManager::prune()`, so `Messages::fake()` records it
+  and `assertPruned()` sees a console or scheduled prune. A `--thread` id that names no thread now
+  exits with an error.
 
 ## 1.0.2 - 2026-10-04
 
