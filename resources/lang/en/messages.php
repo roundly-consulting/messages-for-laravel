@@ -11,6 +11,7 @@ return [
         'not-the-owner' => '[:participant] does not own this thread, so has no ownership to transfer.',
         'direct-has-no-roles' => 'A direct thread has no roles to change.',
         'direct-is-closed' => 'A direct thread takes no new participants; start a group thread to bring someone in.',
+        'direct-takes-two' => 'A direct thread has one or two participants; start a group thread for more.',
         'participant-missing' => 'The model behind participant [:participant] no longer exists.',
         'thread-missing' => 'The thread of participant [:participant] no longer exists.',
     ],

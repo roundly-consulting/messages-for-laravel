@@ -67,6 +67,13 @@ final class ParticipationException extends Exception
         return new self(is_string($message) ? $message : 'A direct thread takes no new participants.');
     }
 
+    public static function directThreadTakesTwo(): self
+    {
+        $message = trans('messages::messages.participation.direct-takes-two');
+
+        return new self(is_string($message) ? $message : 'A direct thread has one or two participants.');
+    }
+
     public static function inAnotherThread(Participant $participant): self
     {
         $message = trans('messages::messages.scope.participant-in-another-thread', [

@@ -9,6 +9,7 @@ use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadCreated;
+use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -36,7 +37,7 @@ final class StartThread
             'is_public' => $isPublic,
             'everyone_can_join' => $everyoneCanJoin,
             'is_direct' => $data->isDirect,
-            'direct_key' => $data->isDirect ? $data->directKey : null,
+            'direct_key' => $data->isDirect ? ($data->directKey ?? $this->pairKey($data)) : null,
             'last_activity_at' => now(),
         ]);
 
@@ -68,6 +69,33 @@ final class StartThread
         $thread->broadcastCreated();
 
         return $thread;
+    }
+
+    /**
+     * The pair key of a direct thread started without one (the builder's
+     * `start()->direct()->withParticipants()`), so it is the pair's one DM exactly like
+     * `Messages::direct()`'s: a second DM for the pair is refused by the unique index instead of
+     * becoming an unkeyed duplicate. One distinct participant is a note-to-self; none leaves the
+     * thread unkeyed; more than two is not a direct thread.
+     *
+     * @throws ParticipationException for more than two distinct participants
+     */
+    private function pairKey(CreateThreadData $data): ?string
+    {
+        $sides = [];
+
+        foreach ($data->participants as $participant) {
+            $sides[$participant->getMorphClass().':'.$participant->getKey()] = $participant;
+        }
+
+        $sides = array_values($sides);
+
+        return match (count($sides)) {
+            0 => null,
+            1 => ThreadModel::class()::directKeyFor($sides[0], $sides[0]),
+            2 => ThreadModel::class()::directKeyFor($sides[0], $sides[1]),
+            default => throw ParticipationException::directThreadTakesTwo(),
+        };
     }
 
     /**

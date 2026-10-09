@@ -15,7 +15,9 @@ final readonly class CreateThreadData
      * @param  string|null  $directKey  The pair key of a direct thread ({@see Thread::directKeyFor()}),
      *                                  unique among threads: the database refuses a second
      *                                  thread with the same key. Set by
-     *                                  {@see FindOrCreateDirectThread}; ignored on group threads.
+     *                                  {@see FindOrCreateDirectThread}; when null, a direct thread
+     *                                  of one or two participants is keyed from them. Ignored on
+     *                                  group threads.
      */
     public function __construct(
         public ?string $name = null,

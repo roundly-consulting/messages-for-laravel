@@ -8,8 +8,10 @@ use Illuminate\Support\Facades\DB;
 use RoundlyConsulting\Messages\Actions\FindOrCreateDirectThread;
 use RoundlyConsulting\Messages\Actions\StartThread;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Tests\Fixtures\QueryRecorder;
 use RoundlyConsulting\Messages\Tests\Models\Company;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -136,4 +138,66 @@ it('leaves group threads unkeyed', function () {
 
     expect($group->direct_key)->toBeNull()
         ->and(Messages::start('Another pair')->withParticipants([$this->alice, $this->bob])->create()->direct_key)->toBeNull();
+});
+
+/**
+ * The builder made direct threads without the pair key: `start()->direct()->withParticipants()`
+ * beside an existing DM gave the pair a second, unkeyed one, `direct()` then returned whichever
+ * the engine happened to list first, and a third participant made a three-person "direct"
+ * thread. Builder DMs of one or two participants now carry the key, more are refused, and the
+ * lookup is ordered.
+ */
+describe('a direct thread from the builder', function () {
+    it('carries the pair key', function () {
+        $dm = Messages::start()->direct()->withParticipants([$this->alice, $this->bob])->create();
+
+        expect($dm->direct_key)->toBe(Thread::directKeyFor($this->alice, $this->bob))
+            ->and(Messages::direct($this->bob, $this->alice)->getKey())->toBe($dm->getKey());
+    });
+
+    it('keys a note-to-self, however often the one side is listed', function (array $sides) {
+        $self = Messages::start()->direct()->withParticipants(array_map(fn (string $side) => $this->{$side}, $sides))->create();
+
+        expect($self->direct_key)->toBe(Thread::directKeyFor($this->alice, $this->alice))
+            ->and($self->participants()->count())->toBe(1);
+    })->with([
+        'once' => [['alice']],
+        'twice' => [['alice', 'alice']],
+    ]);
+
+    it('refuses a second DM for a pair that has one', function () {
+        $first = Messages::direct($this->alice, $this->bob);
+
+        expect(fn () => Messages::start()->direct()->withParticipants([$this->bob, $this->alice])->create())
+            ->toThrow(UniqueConstraintViolationException::class);
+
+        expect(Thread::query()->withTrashed()->where('is_direct', true)->count())->toBe(1)
+            ->and(Messages::direct($this->alice, $this->bob)->getKey())->toBe($first->getKey());
+    });
+
+    it('refuses more than two participants before writing anything', function () {
+        $carol = User::create();
+
+        expect(fn () => Messages::start()->direct()->withParticipants([$this->alice, $this->bob, $carol])->create())
+            ->toThrow(ParticipationException::class, ParticipationException::directThreadTakesTwo()->getMessage());
+
+        expect(Thread::query()->withTrashed()->count())->toBe(0);
+    });
+
+    it('leaves a direct thread with no participants unkeyed', function () {
+        expect(Messages::start()->direct()->create()->direct_key)->toBeNull();
+    });
+});
+
+it('orders the direct-thread lookup', function () {
+    Messages::direct($this->alice, $this->bob);
+
+    $log = QueryRecorder::during(fn () => Messages::direct($this->alice, $this->bob));
+
+    $lookup = QueryRecorder::first($log, static fn (string $sql): bool => str_starts_with($sql, 'select')
+        && str_contains($sql, 'from messaging_threads ')
+        && str_contains($sql, 'is_direct'));
+
+    expect($lookup)->not->toBeNull()
+        ->and($log[(int) $lookup]['sql'])->toContain('order by');
 });

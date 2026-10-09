@@ -59,6 +59,13 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   and Slovak). Any DM participant could add a third person, who then read the pair's whole history
   in a thread that still answered as their DM. Start a group thread to bring someone in; adding
   someone already in the DM still returns their row.
+- **Behaviour change:** a direct thread made with the builder
+  (`Messages::start()->direct()->withParticipants(...)`) of one or two participants now carries the
+  pair key, like `Messages::direct()`'s. A second DM for a pair that has one is refused
+  (`UniqueConstraintViolationException`) instead of becoming an unkeyed duplicate, more than two
+  participants throw `ParticipationException::directThreadTakesTwo()` (English and Slovak), and a
+  builder DM with no participants stays unkeyed. `Messages::direct()` now looks the DM up oldest
+  first, so it always returns the same thread.
 
 ## 1.0.2 - 2026-10-04
 

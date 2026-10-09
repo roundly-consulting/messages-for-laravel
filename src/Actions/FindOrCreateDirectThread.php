@@ -33,7 +33,8 @@ final class FindOrCreateDirectThread
         $key = $model::directKeyFor($first, $second);
 
         for ($attempt = 1; ; $attempt++) {
-            $existing = $model::query()->between($first, $second)->first();
+            // Oldest first: should a pair ever hold two DMs, every lookup returns the same one.
+            $existing = $model::query()->between($first, $second)->orderBy('id')->first();
 
             if ($existing instanceof Thread) {
                 return $existing;
