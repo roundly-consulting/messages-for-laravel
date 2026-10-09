@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Resources\Messages\MessageResource as PublishedMessageResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\MissingValue;
 use RoundlyConsulting\Messages\Actions\SendMessage;
@@ -142,4 +143,50 @@ it('falls back to ids when the participant model does not participate', function
     expect($payload['participant'])
         ->toHaveKey('id')
         ->toHaveKey('type');
+});
+
+/**
+ * `edited_at` was read off `updated_at`, which a soft delete and a restore stamp too: an unsent
+ * message reported an edit, and so did one restored afterwards, though neither was ever
+ * reworded — while a real edit in the same second as the send reported none. An edit is now
+ * recorded where it happens, and both the package resource and the published one read that.
+ */
+it('reports no edit for a message unsent and restored', function () {
+    require_once dirname(__DIR__, 2).'/stubs/Http/Resources/MessageResource.php.stub';
+    $this->freezeSecond();
+
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+    $message = Messages::send($thread, $user, 'never reworded');
+
+    $this->travel(5)->minutes();
+    Messages::message($message)->delete();
+    $unsent = $message->fresh();
+
+    $this->travel(1)->minute();
+    $message->restore();
+    $restored = $message->fresh();
+
+    $request = Request::create('/');
+
+    expect(MessageResource::make($unsent)->toArray($request)['edited_at'])->toBeNull()
+        ->and(MessageResource::make($restored)->toArray($request)['edited_at'])->toBeNull()
+        ->and(PublishedMessageResource::make($unsent)->toArray($request)['edited_at'])->toBeNull()
+        ->and(PublishedMessageResource::make($restored)->toArray($request)['edited_at'])->toBeNull();
+});
+
+it('reports an edit made in the same second as the send', function () {
+    require_once dirname(__DIR__, 2).'/stubs/Http/Resources/MessageResource.php.stub';
+    $this->freezeSecond();
+
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+    $message = Messages::send($thread, $user, 'tpyo');
+    Messages::message($message)->edit('typo', by: $user);
+
+    $request = Request::create('/');
+    $editedAt = MessageResource::make($message->fresh())->toArray($request)['edited_at'];
+
+    expect($editedAt)->toBe(now()->toIso8601String())
+        ->and(PublishedMessageResource::make($message->fresh())->toArray($request)['edited_at'])->toBe($editedAt);
 });

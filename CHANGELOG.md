@@ -36,6 +36,12 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - An unsend and a leave are broadcast once (`messaging.message.unsent`,
   `messaging.participant.left`) instead of twice: a soft delete fires both the `trashed` and the
   `deleted` model event, and the `deleted` broadcast now goes out for a force delete only.
+- `MessageResource`'s `edited_at` (and the published resource's) now reports real edits only. It
+  used to be read off `updated_at`, so an unsent or restored message showed as edited and an edit
+  within the second of the send did not. A change of the message body now records
+  `meta.edited_at`, and `edited_at` reads that. Messages edited before this release carry no
+  marker and report `edited_at` as `null`; a published resource needs the same `editedAt()` change
+  (copy it from the package's `MessageResource`).
 
 ## 1.0.2 - 2026-10-04
 

@@ -68,6 +68,15 @@ class Message extends Model implements HasMedia
 
     protected static function booted(): void
     {
+        // An edit is recorded where it happens, in `meta.edited_at`: `updated_at` cannot tell one
+        // apart, because an unsend and a restore stamp it too — and an edit within the send's own
+        // second leaves it equal to `created_at`.
+        static::updating(static function (Message $message): void {
+            if ($message->isDirty('message')) {
+                $message->meta = [...($message->meta ?? []), 'edited_at' => now()->toIso8601String()];
+            }
+        });
+
         // Force-deleting (hard delete / prune) a message clears its attachment files; soft
         // deletes keep them. Bulk force-deletes (PruneMessages) skip model events, so the prune
         // action clears attachments in its own loop.

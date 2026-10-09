@@ -38,19 +38,25 @@ final class MessageResource extends JsonResource
                 ),
             'reply_to' => $this->replyInfo($meta),
             'sent_at' => $this->created_at->toIso8601String(),
-            'edited_at' => $this->editedAt(),
+            'edited_at' => $this->editedAt($meta),
         ];
     }
 
-    private function editedAt(): ?string
+    /**
+     * When the text was last reworded — recorded by the model in `meta.edited_at` when its body
+     * changes. Not `updated_at`, which an unsend and a restore stamp too.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function editedAt(array $meta): ?string
     {
-        $updated = $this->updated_at;
+        $editedAt = $meta['edited_at'] ?? null;
 
-        if ($this->type !== MessageType::Text || $updated === null || $updated->equalTo($this->created_at)) {
+        if ($this->type !== MessageType::Text || ! is_string($editedAt) || $editedAt === '') {
             return null;
         }
 
-        return $updated->toIso8601String();
+        return $editedAt;
     }
 
     /**
