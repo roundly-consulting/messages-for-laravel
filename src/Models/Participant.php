@@ -36,7 +36,7 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  * @property-read Model|null $participant
- * @property-read Thread $thread
+ * @property-read Thread|null $thread null once the thread is soft-deleted (the row outlives it)
  *
  * Not final: `messages.models.participant` documents swapping in a host subclass.
  */
@@ -113,28 +113,31 @@ class Participant extends Model
      * Move this participant's read pointer to the thread's newest message — the same
      * operation as `Messages::markRead()`, so it fires `ThreadRead` and the fake sees it.
      *
-     * @throws ParticipationException when the participating model no longer exists
+     * @throws ParticipationException when the participating model or the thread no longer exists
      */
     public function markAsRead(): static
     {
         $participant = $this->participant ?? throw ParticipationException::participantMissing($this);
+        $thread = $this->thread ?? throw ParticipationException::threadMissing($this);
 
-        $updated = app(MessagesManager::class)->markRead($this->thread, $participant);
+        $updated = app(MessagesManager::class)->markRead($thread, $participant);
 
         $this->setRawAttributes($updated->getAttributes(), sync: true);
 
         return $this;
     }
 
+    /** False for a thread that is gone — a deleted thread counts nothing as unread. */
     public function hasUnread(): bool
     {
         $participant = $this->participant;
+        $thread = $this->thread;
 
-        if (! $participant instanceof Model) {
+        if (! $participant instanceof Model || ! $thread instanceof Thread) {
             return false;
         }
 
-        return $this->thread->unreadCountFor($participant) > 0;
+        return $thread->unreadCountFor($participant) > 0;
     }
 
     /** @return BelongsTo<Thread, $this> */

@@ -11,6 +11,7 @@ return [
         'not-the-owner' => '[:participant] nie je vlastníkom tejto konverzácie, preto nemôže vlastníctvo odovzdať.',
         'direct-has-no-roles' => 'Priama konverzácia nemá žiadne roly, ktoré by bolo možné zmeniť.',
         'participant-missing' => 'Model účastníka [:participant] už neexistuje.',
+        'thread-missing' => 'Konverzácia účastníka [:participant] už neexistuje.',
     ],
 
     'permissions' => [

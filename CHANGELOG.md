@@ -30,6 +30,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - `messages:prune` now runs through `MessagesManager::prune()`, so `Messages::fake()` records it
   and `assertPruned()` sees a console or scheduled prune. A `--thread` id that names no thread now
   exits with an error.
+- `Participant::hasUnread()` on a participation of a soft-deleted thread now returns `false`
+  instead of crashing, and `Participant::markAsRead()` there throws
+  `ParticipationException::threadMissing()` (English and Slovak) instead of a `TypeError`.
 
 ## 1.0.2 - 2026-10-04
 

@@ -77,4 +77,13 @@ final class ParticipationException extends Exception
 
         return new self(is_string($message) ? $message : 'The participating model no longer exists.');
     }
+
+    public static function threadMissing(Participant $participant): self
+    {
+        $message = trans('messages::messages.participation.thread-missing', [
+            'participant' => (string) $participant->getKey(),
+        ]);
+
+        return new self(is_string($message) ? $message : 'The thread no longer exists.');
+    }
 }

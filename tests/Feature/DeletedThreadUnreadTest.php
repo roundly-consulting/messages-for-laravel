@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Tests\Models\User;
@@ -39,4 +40,26 @@ it('counts the thread again once it is restored', function () {
     $this->deleted->restore();
 
     expect(Messages::unreadCount($this->bob))->toBe(3);
+});
+
+/**
+ * Participant rows outlive a soft-deleted thread (only a hard delete cascades), so a host
+ * listing `$user->participations` still holds them — and `$participant->thread` is null there.
+ * `hasUnread()` crashed calling a method on null and `markAsRead()` with a TypeError.
+ */
+it('answers a participation of a deleted thread without crashing', function () {
+    $participation = $this->bob->participations()->where('thread_id', $this->deleted->getKey())->firstOrFail();
+
+    expect($participation->hasUnread())->toBeFalse()
+        ->and(fn () => $participation->markAsRead())->toThrow(ParticipationException::class, 'no longer exists');
+});
+
+it('works again on the participation once the thread is restored', function () {
+    $this->deleted->restore();
+
+    $participation = $this->bob->participations()->where('thread_id', $this->deleted->getKey())->firstOrFail();
+
+    expect($participation->hasUnread())->toBeTrue()
+        ->and($participation->markAsRead()->last_read_message_id)->not->toBeNull()
+        ->and($participation->hasUnread())->toBeFalse();
 });
