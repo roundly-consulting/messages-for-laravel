@@ -19,6 +19,9 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 - A reply to a system message (a join, leave or rename notice) now quotes the notice as it reads
   ("Anna joined the conversation.") instead of its raw translation key, in `meta.quote.excerpt`
   and in `MessageResource`'s `reply_to.excerpt`.
+- A reply to an unsent message of the same thread is still refused, but now with
+  `MessageException::alreadyDeleted()` instead of the misleading "a reply must target a message in
+  the same thread".
 
 ## 1.0.2 - 2026-10-04
 

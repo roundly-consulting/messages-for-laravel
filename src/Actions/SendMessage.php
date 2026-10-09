@@ -125,7 +125,8 @@ final class SendMessage
     {
         $model = MessageModel::class();
 
-        $parent = $model::query()->find($data->parentMessageId);
+        // With the unsent ones, so an unsent parent of this thread is refused for what it is.
+        $parent = $model::query()->withTrashed()->find($data->parentMessageId);
 
         if (! $parent instanceof Message) {
             throw MessageException::replyAcrossThreads();
@@ -135,6 +136,11 @@ final class SendMessage
         // where the thread's cast key is the int 1.
         if ((string) $parent->thread_id !== (string) $data->thread->getKey()) {
             throw MessageException::replyAcrossThreads();
+        }
+
+        // Quoting an unsent message would snapshot text its author took back.
+        if ($parent->trashed()) {
+            throw MessageException::alreadyDeleted($parent);
         }
 
         $meta['quote'] = [

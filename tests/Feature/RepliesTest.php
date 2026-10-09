@@ -173,3 +173,30 @@ it('quotes a system message as it reads, not as its translation key', function (
         ->not->toContain('messages::')
         ->and(MessageResource::make($reply)->toArray(Request::create('/'))['reply_to']['excerpt'])->toBe($joined->preview());
 });
+
+/**
+ * Replying to an unsent message is refused — quoting it would snapshot text its author took
+ * back — but it was refused as a "reply to another thread", which it is not.
+ */
+it('refuses a reply to an unsent message of the same thread as already deleted', function () {
+    $user = User::create();
+    $thread = Messages::start('Chat')->withParticipant($user)->create();
+    $parent = Messages::send($thread, $user, 'take this back');
+    Messages::message($parent)->delete();
+
+    expect(fn () => Messages::to($thread)->from($user)->replyingTo($parent)->send('reply'))
+        ->toThrow(MessageException::class, MessageException::alreadyDeleted($parent)->getMessage());
+
+    expect(Message::query()->withTrashed()->count())->toBe(1);
+});
+
+it('still refuses an unsent message of another thread as a cross-thread reply', function () {
+    $user = User::create();
+    $threadA = Messages::start('A')->withParticipant($user)->create();
+    $threadB = Messages::start('B')->withParticipant($user)->create();
+    $parent = Messages::send($threadA, $user, 'in A');
+    Messages::message($parent)->delete();
+
+    expect(fn () => Messages::to($threadB)->from($user)->replyingTo($parent)->send('reply'))
+        ->toThrow(MessageException::class, MessageException::replyAcrossThreads()->getMessage());
+});
