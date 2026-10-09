@@ -31,24 +31,31 @@ final class RemoveParticipant
             MessagingPermissions::authorizeManage($data->thread, $data->actor, 'messages::messages.permissions.actions.remove-participants');
         }
 
-        $participant = $data->thread
-            ->participants()
-            ->whereMorphedTo('participant', $data->participant)
-            ->first();
+        // Serialised per thread, as adds are: "does anyone else remain?" and the delete must not
+        // let a join slip in between — it would see the owner still there, take `member`, and be
+        // left in a thread with no owner at all.
+        $data->thread->getConnection()->transaction(function () use ($data, $removesOther): void {
+            $data->thread->newQueryWithoutScopes()->whereKey($data->thread->getKey())->lockForUpdate()->first();
 
-        if (! $participant instanceof Participant) {
-            throw ParticipationException::notAParticipant($data->participant);
-        }
+            $participant = $data->thread
+                ->participants()
+                ->whereMorphedTo('participant', $data->participant)
+                ->first();
 
-        // ...and, with roles enforced, a role above theirs: an admin removes members, never a
-        // fellow admin or the owner.
-        if ($removesOther) {
-            MessagingPermissions::authorizeRemove($data->thread, $data->actor, $participant);
-        }
+            if (! $participant instanceof Participant) {
+                throw ParticipationException::notAParticipant($data->participant);
+            }
 
-        $this->keepTheOwner($data, $participant);
+            // ...and, with roles enforced, a role above theirs: an admin removes members, never
+            // a fellow admin or the owner.
+            if ($removesOther && $data->actor !== null) {
+                MessagingPermissions::authorizeRemove($data->thread, $data->actor, $participant);
+            }
 
-        $participant->delete();
+            $this->keepTheOwner($data, $participant);
+
+            $participant->delete();
+        });
 
         // A loaded relation would still answer `participationOf()` with the removed row.
         $data->thread->unsetRelation('participants');

@@ -6,6 +6,7 @@ use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
 use RoundlyConsulting\Messages\Exceptions\UnauthorizedMessagingAction;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Tests\Fixtures\QueryRecorder;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 /**
@@ -106,4 +107,61 @@ it('lets either side of a roleless direct thread leave', function () {
     Messages::thread($dm)->participants()->leave($this->owner);
 
     expect($dm->participants()->count())->toBe(1);
+});
+
+/**
+ * The owner may leave last — but on a thread open to everyone, the next person to join used to
+ * get `member`, and with no owner nobody could rename, archive, add, remove, re-role or transfer
+ * ownership again. The next participant into an ownerless group thread becomes its owner.
+ */
+describe('a group thread whose owner left last', function (): void {
+    beforeEach(function (): void {
+        $this->open = Messages::start('Open')->everyoneCanJoin()->withParticipants([$this->owner])->create();
+        Messages::thread($this->open)->participants()->leave($this->owner);
+    });
+
+    it('makes the next one to join its owner', function (): void {
+        $this->member->joinThread($this->open);
+
+        expect($this->open->roleOf($this->member))->toBe(ParticipantRole::Owner)
+            ->and(Messages::thread($this->open)->rename('Ours now', by: $this->member)->name)->toBe('Ours now');
+    });
+
+    it('makes a participant a trusted caller adds its owner', function (): void {
+        Messages::thread($this->open)->participants()->add($this->admin);
+
+        expect($this->open->roleOf($this->admin))->toBe(ParticipantRole::Owner);
+    });
+
+    it('gives everyone after the new owner the member role', function (): void {
+        $this->member->joinThread($this->open);
+        $this->admin->joinThread($this->open);
+
+        expect($this->open->roleOf($this->admin))->toBe(ParticipantRole::Member)
+            ->and($this->open->participants()->where('role', ParticipantRole::Owner->value)->count())->toBe(1);
+    });
+});
+
+it('still adds a member to a thread that has its owner', function () {
+    $newcomer = User::create();
+
+    expect($this->participants->add($newcomer)->role)->toBe(ParticipantRole::Member);
+});
+
+/**
+ * Removal reads "does anyone else remain?" and then deletes the owner's row. A join landing in
+ * between saw the owner still there (so took `member`), and then the owner was gone: an ownerless
+ * thread again. Removal now takes the same thread-row lock as adding, before that check.
+ */
+it('locks the thread row before it checks the owner can go', function () {
+    $solo = Messages::start('Solo')->withParticipants([$this->owner])->create();
+
+    $log = QueryRecorder::during(fn () => Messages::thread($solo)->participants()->leave($this->owner));
+
+    $othersRemain = QueryRecorder::first($log, static fn (string $sql): bool => str_starts_with($sql, 'select exists')
+        && str_contains($sql, 'from messaging_participants ')
+        && (str_contains($sql, '!=') || str_contains($sql, '<>')));
+
+    expect($othersRemain)->not->toBeNull()
+        ->and(QueryRecorder::lockHeldAt($log, (int) $othersRemain, 'messaging_threads'))->toBeTrue();
 });

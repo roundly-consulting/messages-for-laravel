@@ -48,6 +48,11 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   `withTrashed()` let someone who had left manage the thread. `Thread::participationOf()` now
   ignores trashed rows, and adding, removing, re-roling and transferring ownership drop the loaded
   relation.
+- A group thread can no longer be left without an owner. The owner may still leave last, but the
+  next participant to join (or be added) — on any group thread with no owner, including one started
+  without participants — now becomes its owner instead of a member, so the thread stays manageable.
+  Removing a participant now takes the same per-thread lock as adding one, so a join racing the
+  owner's departure cannot end ownerless either.
 
 ## 1.0.2 - 2026-10-04
 

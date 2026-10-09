@@ -30,7 +30,8 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
  *
  * Ownership is never granted here once a thread has an owner, and never by an actor: it changes
  * hands only through {@see TransferOwnership}. (A new thread's first participant becomes its
- * owner through {@see StartThread}, which calls this without an actor.)
+ * owner through {@see StartThread}, which calls this without an actor; the next participant into
+ * a group thread its owner left last becomes the owner too.)
  */
 final class AddParticipant
 {
@@ -124,11 +125,20 @@ final class AddParticipant
      * Group threads always carry a role (defaulting to Member) — with roles enforced or not, so
      * switching enforcement on later finds every participant ranked; direct threads stay
      * roleless.
+     *
+     * A group thread also always has an owner. The owner may leave last, so the next participant
+     * into a thread that has none becomes it — otherwise nobody could rename, archive, add,
+     * remove, re-role or transfer it ever again. Runs under the thread lock, so two joiners
+     * cannot both find it ownerless.
      */
     private function resolveRole(AddParticipantData $data): ?ParticipantRole
     {
         if ($data->thread->is_direct) {
             return null;
+        }
+
+        if (! $this->hasOwner($data)) {
+            return ParticipantRole::Owner;
         }
 
         return $data->role ?? ParticipantRole::Member;
