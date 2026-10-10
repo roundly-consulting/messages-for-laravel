@@ -6,6 +6,8 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+## 1.1.0 - 2026-10-10
+
 ### Added
 
 - A `{type}` placeholder for `messages.broadcasting.threads.per-participant-channel`: the
@@ -14,6 +16,11 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   `{name}` (the class basename) is unchanged, but without a morph map two models sharing a basename
   (`App\Models\User` and `App\Models\Admin\User`) share a `{name}` channel and hear each other's
   new threads — switch to `{type}` (and update `routes/channels.php`) or register a morph map.
+
+### Changed
+
+- Documentation: the README hero image uses an absolute URL, so it renders on Packagist and other
+  sites.
 
 ### Fixed
 
