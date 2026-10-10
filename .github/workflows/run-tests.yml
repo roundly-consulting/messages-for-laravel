@@ -93,3 +93,51 @@ jobs:
         # Coverage is enforced on the sqlite matrix; this is a correctness leg, and
         # re-measuring it doubles the slowest job for no signal.
         run: vendor/bin/pest --ci
+
+  test-mysql:
+    runs-on: ubuntu-latest
+    name: P8.4 - mysql real-engine
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_DATABASE: testing
+          MYSQL_USER: testing
+          MYSQL_PASSWORD: secret
+          MYSQL_ROOT_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, mysql, pdo_mysql, bcmath, intl, gd, exif, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Execute tests against mysql
+        env:
+          # On MySQL the newest-message lookup takes its locking-read branch (REPEATABLE
+          # READ) and a uuid key is a char(36); neither exists on sqlite or postgres. This
+          # leg runs the whole suite through both on the real engine.
+          TESTING_DB_DRIVER: mysql
+          TESTING_DB_HOST: 127.0.0.1
+          TESTING_DB_PORT: 3306
+          TESTING_DB_DATABASE: testing
+          TESTING_DB_USERNAME: root
+          TESTING_DB_PASSWORD: secret
+        # Coverage is enforced on the sqlite matrix; this is a correctness leg.
+        run: vendor/bin/pest --ci
