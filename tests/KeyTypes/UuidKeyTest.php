@@ -33,8 +33,13 @@ it('mints uuid primary keys and tracks them across the internal foreign keys', f
 });
 
 it('emits string id columns across every messaging table', function (): void {
-    expect(Schema::getColumnType('messaging_threads', 'id'))->toBeIn(['varchar', 'string', 'uuid'])
-        ->and(Schema::getColumnType('messaging_messages', 'thread_id'))->toBeIn(['varchar', 'string', 'uuid']);
+    // Each engine names a uuid() column its own way: SQLite `varchar`, Postgres `uuid`, MySQL
+    // `char` (a char(36)). None of them is an integer type, so a bigint id still fails here.
+    $stringish = ['varchar', 'string', 'uuid', 'char'];
+    $integerish = ['integer', 'bigint', 'int8'];
+
+    expect(Schema::getColumnType('messaging_threads', 'id'))->toBeIn($stringish)->not->toBeIn($integerish)
+        ->and(Schema::getColumnType('messaging_messages', 'thread_id'))->toBeIn($stringish)->not->toBeIn($integerish);
 });
 
 /**
