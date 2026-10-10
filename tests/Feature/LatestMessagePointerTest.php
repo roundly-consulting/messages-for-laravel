@@ -147,14 +147,14 @@ it('refreshes both threads when a message moves between them', function (): void
 });
 
 /**
- * Two sends racing on one thread: each looks up the newest message, then writes it. Without a
- * lock, T1 can compute its own message (T2's is not committed yet), wait behind T2's write, and
- * then overwrite T2's newer answer with its older one — the pointer ends on m1 though m2 is
- * newest, and an unsend racing a send ends the same way. One connection cannot block on its own
- * lock, so this pins the guard instead of replaying the race: the thread row is locked, in a
- * transaction that is still open, before the newest-message lookup runs.
+ * One write that maintains the pointer — a send, an unsend or a restore — on a thread that
+ * already holds a message. Returns what it said to the database and where the newest-message
+ * lookup sits in that log.
+ *
+ * @return array{list<array{sql: string, depth: int}>, int}
  */
-it('locks the thread row before it looks up the newest message', function (string $flow): void {
+function recordPointerSync(string $flow): array
+{
     $user = User::create();
     $thread = Messages::start('Hello')->withParticipant($user)->create();
     $message = Messages::send($thread, $user, 'first');
@@ -173,8 +173,23 @@ it('locks the thread row before it looks up the newest message', function (strin
         && str_contains($sql, 'from messaging_messages ')
         && str_contains($sql, 'order by created_at desc'));
 
-    expect($lookup)->not->toBeNull()
-        ->and(QueryRecorder::lockHeldAt($log, (int) $lookup, 'messaging_threads'))->toBeTrue();
+    expect($lookup)->not->toBeNull();
+
+    return [$log, (int) $lookup];
+}
+
+/**
+ * Two sends racing on one thread: each looks up the newest message, then writes it. Without a
+ * lock, T1 can compute its own message (T2's is not committed yet), wait behind T2's write, and
+ * then overwrite T2's newer answer with its older one — the pointer ends on m1 though m2 is
+ * newest, and an unsend racing a send ends the same way. One connection cannot block on its own
+ * lock, so this pins the guard instead of replaying the race: the thread row is locked, in a
+ * transaction that is still open, before the newest-message lookup runs.
+ */
+it('locks the thread row before it looks up the newest message', function (string $flow): void {
+    [$log, $lookup] = recordPointerSync($flow);
+
+    expect(QueryRecorder::lockHeldAt($log, $lookup, 'messaging_threads'))->toBeTrue();
 })->with(['send', 'unsend', 'restore']);
 
 /**
@@ -183,8 +198,24 @@ it('locks the thread row before it looks up the newest message', function (strin
  * transaction included — so the lookup must be a locking read, which always sees the latest
  * committed rows. Postgres reads a fresh snapshot per statement and needs no lock there.
  *
- * The suite has no MySQL engine, so this runs the lookup on the in-memory connection with its
- * driver reported as mysql — the only thing the decision reads.
+ * This is the real engine (the `test-mysql` leg): the same three writes, with the driver, the
+ * grammar and the SQL all MySQL's own. The thread row's `for update` comes first, and the lookup
+ * after it is itself a `lock in share mode` / `for share` read inside that same open transaction.
+ */
+it('runs the newest-message lookup as a locking read under the thread lock on mysql', function (string $flow): void {
+    [$log, $lookup] = recordPointerSync($flow);
+
+    expect(QueryRecorder::locksShared($log[$lookup]['sql']))->toBeTrue()
+        ->and($log[$lookup]['depth'])->toBeGreaterThanOrEqual(1)
+        ->and(QueryRecorder::lockHeldAt($log, $lookup, 'messaging_threads'))->toBeTrue();
+})->with(['send', 'unsend', 'restore'])
+    ->skip(fn (): bool => ! in_array(DriverMatrix::driver(), ['mysql', 'mariadb'], true), 'needs a real mysql engine');
+
+/**
+ * The same branch where there is no MySQL engine: a local run, and the sqlite matrix that covers
+ * both Laravel majors (the `test-mysql` leg resolves only the latest). It runs the lookup on the
+ * in-memory connection with the driver reported as mysql — the only thing the decision reads — so
+ * a regression in the branch shows before CI is dispatched.
  */
 it('makes the newest-message lookup a locking read on mysql', function (): void {
     $user = User::create();
