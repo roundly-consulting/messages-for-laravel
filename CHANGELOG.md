@@ -6,10 +6,13 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+## 1.1.1 - 2026-10-11
+
 ### Changed
 
 - Maintenance: requires the latest roundly packages — package-toolkit `^1.3.0`, enums `^1.1.0`,
   media-library `^1.1.2`; dev: testing `^1.2.1`.
+- Maintenance: CI also runs the test suite against MySQL 8, alongside SQLite and PostgreSQL.
 
 ## 1.1.0 - 2026-10-10
 
