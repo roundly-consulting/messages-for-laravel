@@ -6,11 +6,23 @@ namespace RoundlyConsulting\Messages\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /** @extends Factory<Thread> */
 final class ThreadFactory extends Factory
 {
     protected $model = Thread::class;
+
+    /**
+     * Build the model the host configured in `messages.models.thread`, not the packaged one,
+     * so a host subclass comes out of the factory with its own events and observers.
+     *
+     * @return class-string<Thread>
+     */
+    public function modelName(): string
+    {
+        return ThreadModel::class();
+    }
 
     public function definition(): array
     {

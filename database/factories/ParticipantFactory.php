@@ -9,11 +9,23 @@ use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Support\MessageModel;
+use RoundlyConsulting\Messages\Support\ParticipantModel;
 
 /** @extends Factory<Participant> */
 final class ParticipantFactory extends Factory
 {
     protected $model = Participant::class;
+
+    /**
+     * Build the model the host configured in `messages.models.participant`, not the packaged one,
+     * so a host subclass comes out of the factory with its own events and observers.
+     *
+     * @return class-string<Participant>
+     */
+    public function modelName(): string
+    {
+        return ParticipantModel::class();
+    }
 
     public function definition(): array
     {

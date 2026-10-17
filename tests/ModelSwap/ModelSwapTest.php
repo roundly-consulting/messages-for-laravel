@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Models\Message;
+use RoundlyConsulting\Messages\Models\Participant;
+use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Tests\Models\CustomMessage;
 use RoundlyConsulting\Messages\Tests\Models\CustomParticipant;
 use RoundlyConsulting\Messages\Tests\Models\CustomThread;
@@ -77,3 +80,26 @@ it('honours a host participant model when a thread is joined', function (): void
 // key really defaults to the packaged model — is pinned once in tests/ArchTest.php by
 // `ArchPresets::swappableModelsAreNotFinal()`. It deliberately does NOT live here: that
 // preset asserts the config *default*, which this directory has swapped away.
+
+/**
+ * The factories named the packaged models, so `Thread::factory()` and its siblings (and the
+ * parent thread a message or participant factory makes) built the packaged classes after a host
+ * swapped them: the host's model events never ran.
+ */
+it('builds the configured models from the packaged factories', function (): void {
+    CustomThread::resetCreationCount();
+    CustomMessage::resetCreationCount();
+    CustomParticipant::resetCreationCount();
+
+    $message = Message::factory()->create();
+    $participant = Participant::factory()->create();
+
+    expect(Thread::factory()->create()::class)->toBe(CustomThread::class)
+        ->and(CustomThread::factory()->create()::class)->toBe(CustomThread::class)
+        ->and($message::class)->toBe(CustomMessage::class)
+        ->and($participant::class)->toBe(CustomParticipant::class)
+        // The message's and the participant's parent threads come from the thread factory.
+        ->and(CustomThread::creationCount())->toBe(4)
+        ->and(CustomMessage::creationCount())->toBe(1)
+        ->and(CustomParticipant::creationCount())->toBe(1);
+});

@@ -8,11 +8,23 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use RoundlyConsulting\Messages\Enums\MessageType;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\MessageModel;
 
 /** @extends Factory<Message> */
 final class MessageFactory extends Factory
 {
     protected $model = Message::class;
+
+    /**
+     * Build the model the host configured in `messages.models.message`, not the packaged one,
+     * so a host subclass comes out of the factory with its own events and observers.
+     *
+     * @return class-string<Message>
+     */
+    public function modelName(): string
+    {
+        return MessageModel::class();
+    }
 
     public function definition(): array
     {
