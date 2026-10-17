@@ -71,6 +71,9 @@ ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support', [
     'messages.models.participant',
 ]);
 
+// A host swap reaches the packaged factories too: each one builds the configured model.
+ArchPresets::factoriesResolveThroughSeam(__DIR__.'/../database/factories', __DIR__.'/../src', 'Support');
+
 /**
  * The morph-key seam, guarded. The messages and participants tables reach their polymorphic
  * columns through `morphKey($name, KeyType::fromConfig('messages.key_type'))`, never a raw
