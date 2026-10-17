@@ -20,8 +20,9 @@ beforeEach(function (): void {
 });
 
 /**
- * The real `secure` disk sits in a throwaway root per test ({@see TestCase}), never the
- * testbench skeleton's storage/ — which every parallel process shared.
+ * The real `secure` disk sits in a throwaway root per process, emptied after every test
+ * ({@see TestCase}), never the testbench skeleton's storage/ — which every parallel process
+ * shared.
  */
 it('stores on a sandboxed disk, never the shared skeleton', function (): void {
     expect(Storage::disk('secure')->path(''))->toContain('messages-secure-');

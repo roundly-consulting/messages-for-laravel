@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Tests;
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
 use RoundlyConsulting\Messages\MessagesServiceProvider;
@@ -14,7 +12,9 @@ use RoundlyConsulting\Testing\PackageTestCase;
 
 abstract class TestCase extends PackageTestCase
 {
-    private string $secureRoot = '';
+    private static ?string $appKey = null;
+
+    private static ?string $secureRoot = null;
 
     /**
      * Every provider messages hard-requires, in registration order. A host auto-discovers
@@ -32,7 +32,9 @@ abstract class TestCase extends PackageTestCase
 
     /**
      * Migration sources by provider class, never by filename — media-library ships the
-     * `media` table the attachments bucket persists into, and messages ships its own nine.
+     * `media` table the attachments bucket persists into, and messages ships its own — then
+     * the host-owned fixture tables the morph relations and the HasMessaging trait resolve
+     * against (a source, not creates after the migrate, so a kept schema stays kept).
      *
      * @return list<class-string<ServiceProvider>|string>
      */
@@ -41,7 +43,16 @@ abstract class TestCase extends PackageTestCase
         return [
             MediaLibraryServiceProvider::class,
             MessagesServiceProvider::class,
+            __DIR__.'/database/migrations',
         ];
+    }
+
+    /**
+     * Migrate once per worker and schema signature, then reset only the data between tests.
+     */
+    protected function keepsMigratedSchema(): bool
+    {
+        return true;
     }
 
     /**
@@ -50,8 +61,9 @@ abstract class TestCase extends PackageTestCase
     protected function configBeforeBoot(): array
     {
         return [
-            // Required for the media signed streaming route (URL signatures).
-            'app.key' => 'base64:'.base64_encode(random_bytes(32)),
+            // Required for the media signed streaming route (URL signatures). One random key
+            // per process: the config is part of the kept schema's signature.
+            'app.key' => self::$appKey ??= 'base64:'.base64_encode(random_bytes(32)),
 
             // Realtime broadcasting stays off by default; tests opt in per case.
             'messages.broadcasting.enabled' => false,
@@ -76,43 +88,21 @@ abstract class TestCase extends PackageTestCase
     {
         parent::tearDown();
 
-        if ($this->secureRoot !== '') {
-            (new Filesystem)->deleteDirectory($this->secureRoot);
-            $this->secureRoot = '';
+        if (self::$secureRoot !== null) {
+            (new Filesystem)->deleteDirectory(self::$secureRoot);
         }
     }
 
     /**
-     * The `secure` disk's root: a throwaway directory per test. Under the testbench
-     * skeleton's storage/ it was ONE directory for every parallel process — each process's
-     * media ids start at 1, so their attachments collided there, and two test files wiped
-     * it in beforeEach while another process was asserting a file in it still existed.
+     * The `secure` disk's root: a throwaway directory per process, emptied after every test.
+     * Under the testbench skeleton's storage/ it was ONE directory for every parallel
+     * process — each process's media ids start at 1, so their attachments collided there,
+     * and two test files wiped it in beforeEach while another process was asserting a file
+     * in it still existed. Per process rather than per test: the config is part of the kept
+     * schema's signature, so a root minted per test would migrate every test from scratch.
      */
     private function secureRoot(): string
     {
-        if ($this->secureRoot === '') {
-            $this->secureRoot = sys_get_temp_dir().'/messages-secure-'.bin2hex(random_bytes(6));
-        }
-
-        return $this->secureRoot;
-    }
-
-    /**
-     * The host-owned fixture tables the morph relations and the HasMessaging trait resolve
-     * against. The packaged migrations come from {@see migrationSources()}; these five are
-     * stand-ins for tables a host owns, so they are built here rather than shipped.
-     */
-    protected function defineDatabaseMigrations(): void
-    {
-        parent::defineDatabaseMigrations();
-
-        Schema::create('users', fn (Blueprint $table) => $table->id());
-        Schema::create('restaurants', fn (Blueprint $table) => $table->id());
-        Schema::create('companies', fn (Blueprint $table) => $table->id());
-        Schema::create('notifiable_users', fn (Blueprint $table) => $table->id());
-        Schema::create('people', function (Blueprint $table): void {
-            $table->id();
-            $table->string('name')->nullable();
-        });
+        return self::$secureRoot ??= sys_get_temp_dir().'/messages-secure-'.bin2hex(random_bytes(6));
     }
 }
