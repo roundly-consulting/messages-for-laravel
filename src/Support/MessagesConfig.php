@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Support;
 
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Notifications\Notification;
+use ReflectionClass;
+use RoundlyConsulting\Messages\Http\Resources\MessageParticipantResource;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -136,6 +139,25 @@ final class MessagesConfig
 
         if (! is_string($class) || ! is_subclass_of($class, Notification::class)) {
             throw InvalidConfigurationException::notAnImplementation($key, Notification::class, $class);
+        }
+
+        return $class;
+    }
+
+    /**
+     * The resource a participant or sender model renders through: a concrete JsonResource
+     * subclass. The bare JsonResource (it would render every attribute of the model) and an
+     * abstract class are refused like any other non-resource.
+     *
+     * @return class-string<JsonResource>
+     */
+    public static function participantResource(): string
+    {
+        $key = 'messages.resources.participant';
+        $class = self::unlessBlank(config($key)) ?? MessageParticipantResource::class;
+
+        if (! is_string($class) || ! is_subclass_of($class, JsonResource::class) || (new ReflectionClass($class))->isAbstract()) {
+            throw InvalidConfigurationException::notAnImplementation($key, JsonResource::class, $class);
         }
 
         return $class;

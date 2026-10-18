@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Messages\Notifications;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Notifications\Notification;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Support\MessagesConfig;
@@ -35,16 +36,23 @@ class NewMessageNotification extends Notification implements ShouldQueue
     }
 
     /**
+     * The database and broadcast payload. `sender_type` is the sender's class basename (`User`),
+     * never its class name; `null` for a system message.
+     *
      * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array
     {
+        $senderType = $this->message->sender_type;
+
         return [
             'message_id' => $this->message->getKey(),
             'thread_id' => $this->message->thread_id,
             'preview' => $this->message->preview(),
             'sender_id' => $this->message->sender_id,
-            'sender_type' => $this->message->sender_type,
+            'sender_type' => $senderType === null || $senderType === ''
+                ? null
+                : class_basename(Relation::getMorphedModel($senderType) ?? $senderType),
         ];
     }
 }

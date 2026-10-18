@@ -6,6 +6,32 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+### Added
+
+- `MessageParticipantResource`: the JSON resource a participant or message sender renders through
+  — `participant` in `ParticipantResource`, `sender` in `MessageResource`. It renders the model's
+  `participateAs()` when it implements `ParticipatesInMessaging` (unchanged), otherwise
+  `{"id": <key>, "type": "<class basename>"}`.
+- `messages.resources.participant` config key (default `MessageParticipantResource::class`): point
+  it at your own `JsonResource` — it receives the participant model — to add names, avatars or
+  anything else your API needs. A value that is not a concrete `JsonResource` subclass throws
+  `InvalidConfigurationException` naming the key; a blank value is the default.
+  `MessageParticipantResource::configured($model)` builds the configured resource around a model.
+
+### Changed
+
+- No payload a client receives carries a PHP class name any more. `ParticipantResource`'s
+  `participant.type` (for a model without `ParticipatesInMessaging`), `MessageResource`'s
+  `reply_to.sender_type` and `NewMessageNotification`'s `sender_type` (its database and broadcast
+  data) are now the model's class basename (`User`), resolved through the morph map, instead of the
+  morph type — the full class name (`App\Models\User`) on an app without a morph map. Swap
+  `messages.resources.participant` to render participants differently.
+- `MessageResource`'s `sender` for a model without `ParticipatesInMessaging` now renders
+  `{"id", "type"}` instead of `null`, and `ParticipantResource`'s `participant` is `null` (instead of
+  the stored ids) when the participating model no longer exists.
+- The `messages-resources` and `messages-notifications` stubs render the same way. Copies you
+  published earlier keep the old output until you re-publish them or copy the change over.
+
 ## 1.1.2 - 2026-10-17
 
 ### Fixed

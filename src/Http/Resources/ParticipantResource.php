@@ -6,7 +6,6 @@ namespace RoundlyConsulting\Messages\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use RoundlyConsulting\Messages\Interfaces\ParticipatesInMessaging;
 use RoundlyConsulting\Messages\Models\Participant;
 
 /**
@@ -19,22 +18,17 @@ final class ParticipantResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $participant = $this->whenLoaded('participant');
-
         return [
             'id' => $this->id,
             'role' => $this->role?->value,
             'read_at' => $this->read_at?->toIso8601String(),
             'joined_at' => $this->created_at->toIso8601String(),
-            'participant' => $participant instanceof ParticipatesInMessaging
-                ? $participant->participateAs()
-                : $this->when(
-                    $this->resource->relationLoaded('participant'),
-                    fn (): array => [
-                        'id' => $this->participant_id,
-                        'type' => $this->participant_type,
-                    ],
-                ),
+            // Only once the relation is loaded, through `messages.resources.participant`; `null`
+            // when the participating model no longer exists.
+            'participant' => $this->when(
+                $this->resource->relationLoaded('participant'),
+                fn (): ?array => MessageParticipantResource::configured($this->participant)?->resolve($request),
+            ),
         ];
     }
 }

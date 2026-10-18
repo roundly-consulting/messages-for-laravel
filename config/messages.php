@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Messages\Http\Resources\MessageParticipantResource;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
@@ -12,6 +13,27 @@ return [
         'message' => Message::class,
         'thread' => Thread::class,
         'participant' => Participant::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resources
+    |--------------------------------------------------------------------------
+    |
+    | "participant" is the JsonResource a participant or message sender (usually
+    | your User model) renders through — `participant` in ParticipantResource,
+    | `sender` in MessageResource. It receives the participant model. The default
+    | renders the model's participateAs() when it implements
+    | ParticipatesInMessaging, otherwise its key and class basename
+    | ({"id": 5, "type": "User"}) — never a class name. Point it at your own
+    | resource to add what your API needs (name, avatar, ...). A blank value is
+    | the default; anything that is not a JsonResource subclass throws an
+    | InvalidConfigurationException.
+    |
+    */
+
+    'resources' => [
+        'participant' => MessageParticipantResource::class,
     ],
 
     /*

@@ -10,12 +10,16 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\ServiceProvider;
+use RoundlyConsulting\Messages\Actions\SendMessage;
+use RoundlyConsulting\Messages\DataTransferObjects\SendMessageData;
 use RoundlyConsulting\Messages\Facades\Messages;
 use RoundlyConsulting\Messages\Http\Resources\MessageResource;
 use RoundlyConsulting\Messages\Http\Resources\ParticipantResource;
 use RoundlyConsulting\Messages\Http\Resources\ThreadResource;
 use RoundlyConsulting\Messages\MessagesServiceProvider;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
+use RoundlyConsulting\Messages\Tests\Fixtures\HostParticipantResource;
+use RoundlyConsulting\Messages\Tests\Models\Restaurant;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
 /*
@@ -118,3 +122,44 @@ it('notifies exactly like the package notification until the host edits it', fun
         ->and($published->via($bob))->toBe($package->via($bob))
         ->and($published->toArray($bob))->toBe($package->toArray($bob));
 });
+
+/*
+ * The published copies leaked the same class names as the package classes (`participant.type`,
+ * `reply_to.sender_type`, the notification's `sender_type`) and must keep honouring
+ * `messages.resources.participant` after they are published.
+ */
+it('renders participants and senders like the package resources, swapped or not', function (?string $participantResource): void {
+    requirePublishedStubs();
+    config()->set('messages.permissions.enabled', false);
+    config()->set('messages.resources.participant', $participantResource);
+
+    $alice = User::create();
+    $restaurant = Restaurant::create();
+    $thread = Messages::start('Launch')->withParticipant($alice)->create();
+    $thread->participants()->create([
+        'participant_id' => $restaurant->getKey(),
+        'participant_type' => $restaurant->getMorphClass(),
+    ]);
+    $original = Messages::send($thread, $alice, 'First');
+    Messages::to($thread)->from($alice)->replyingTo($original)->send('Second');
+    $fromOutsider = app(SendMessage::class)->execute(new SendMessageData($thread, $restaurant, 'Table ready', requireParticipation: false));
+
+    $request = Request::create('/');
+    $json = fn (JsonResource $resource): string => (string) $resource->toResponse($request)->getContent();
+
+    $inbox = Messages::inboxFor($alice);
+    $messages = Messages::thread($thread)->messages();
+    $participants = $thread->participants()->with('participant')->get();
+    $notification = new NewMessageNotification($fromOutsider);
+
+    expect($json(PublishedThreadResource::collection($inbox)))->toBe($json(ThreadResource::collection($inbox)))
+        ->and($json(PublishedMessageResource::collection($messages)))->toBe($json(MessageResource::collection($messages)))
+        ->and($json(PublishedParticipantResource::collection($participants)))->toBe($json(ParticipantResource::collection($participants)))
+        ->and($json(PublishedMessageResource::collection($messages)))->not->toContain('\\\\')
+        ->and($json(PublishedParticipantResource::collection($participants)))->not->toContain('\\\\')
+        ->and((new PublishedNewMessageNotification($fromOutsider))->toArray($alice))->toBe($notification->toArray($alice))
+        ->and($notification->toArray($alice)['sender_type'])->toBe('Restaurant');
+})->with([
+    'default resource' => [null],
+    'host resource' => [HostParticipantResource::class],
+]);
