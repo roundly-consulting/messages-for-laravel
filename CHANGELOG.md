@@ -6,6 +6,8 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+## 1.2.0 - 2026-10-18
+
 ### Added
 
 - `MessageParticipantResource`: the JSON resource a participant or message sender renders through
@@ -31,6 +33,8 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
   the stored ids) when the participating model no longer exists.
 - The `messages-resources` and `messages-notifications` stubs render the same way. Copies you
   published earlier keep the old output until you re-publish them or copy the change over.
+- Maintenance: dev: testing `^1.6`.
+- Maintenance: CI runs the PostgreSQL and MySQL test legs on tmpfs.
 
 ## 1.1.2 - 2026-10-17
 
