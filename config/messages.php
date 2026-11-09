@@ -171,10 +171,13 @@ return [
 
         'threads' => [
             'public-channel' => 'messaging',
-            // {name} = the participant's lowercased class basename, {id} = its key. Without a
+            // {id} = the participant's key. {name} = its lowercased class basename: without a
             // morph map, two classes sharing a basename (App\Models\User, App\Models\Admin\User)
-            // share a {name} channel — use {type} (the full morph type, lowercased, "\" as ".")
-            // or a morph map to keep them apart.
+            // share a {name} channel. {alias} keeps them apart: the morph alias when the type is
+            // one, otherwise a 16-character hash of the type — never a class name.
+            // Messages::channels()->participant($user) returns the name to subscribe to, and
+            // Messages::channels()->register() authorises it. {type} (the full morph type,
+            // lowercased, "\" as ".") is deprecated: it puts the class name in the channel.
             'per-participant-channel' => 'messaging.participant.{name}.{id}',
             'events' => [
                 'created' => 'messaging.thread.created',

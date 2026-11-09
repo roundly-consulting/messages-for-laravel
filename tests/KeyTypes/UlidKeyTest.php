@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Broadcast;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Tests\Fixtures\AuthorisingBroadcaster;
 use RoundlyConsulting\Messages\Tests\Fixtures\LatestMessageVectors;
 use RoundlyConsulting\Messages\Tests\Models\User;
 
@@ -56,3 +58,16 @@ it('resolves the latest message on ulid keys', function (callable $scenario): vo
 
     LatestMessageVectors::assertScenario($thread, $expected);
 })->with(LatestMessageVectors::scenarios());
+
+it('authorises a thread channel by its ulid key and refuses a malformed one', function (): void {
+    Broadcast::extend('authorising', static fn (): AuthorisingBroadcaster => new AuthorisingBroadcaster);
+    config()->set('broadcasting.default', 'authorising');
+    config()->set('broadcasting.connections.authorising', ['driver' => 'authorising']);
+    Messages::channels()->register();
+
+    $user = User::create();
+    $thread = Messages::start('Team')->withParticipants([$user])->create();
+
+    expect(Broadcast::connection()->allows($user, 'messaging.thread.'.$thread->getKey()))->toBeTrue()
+        ->and(Broadcast::connection()->allows($user, 'messaging.thread.123'))->toBeFalse();
+});

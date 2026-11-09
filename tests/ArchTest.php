@@ -7,6 +7,7 @@ use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
+use RoundlyConsulting\Messages\Support\BroadcastChannels;
 use RoundlyConsulting\Testing\Arch\ArchPresets;
 
 /**
@@ -53,8 +54,11 @@ ArchPresets::swappableModelsAreNotFinal([
  * Messages mints no keys or tokens of its own — uuid7 primary keys come from Laravel's
  * HasUuids, and the signed attachment URLs are Laravel's signer. This pins that a
  * hand-rolled scheme never lands here.
+ *
+ * BroadcastChannels is exempt: its `{alias}` channel segment is a SHA-256 prefix of a morph type
+ * — a stable, public identifier that keeps the class name out of the channel, not a secret.
  */
-ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Messages');
+ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Messages', ignoring: [BroadcastChannels::class]);
 
 /**
  * All three `messages.models.*` keys resolve through the Support seam

@@ -16,6 +16,7 @@ use RoundlyConsulting\Messages\Builders\PendingThread;
 use RoundlyConsulting\Messages\DataTransferObjects\MessagingCall;
 use RoundlyConsulting\Messages\DataTransferObjects\PruneMessagesData;
 use RoundlyConsulting\Messages\Enums\MessagingOperation;
+use RoundlyConsulting\Messages\Handles\ChannelsHandle;
 use RoundlyConsulting\Messages\Handles\MessageHandle;
 use RoundlyConsulting\Messages\Handles\ThreadHandle;
 use RoundlyConsulting\Messages\Models\Message;
@@ -161,6 +162,15 @@ class MessagesManager
     public function message(Message $message): MessageHandle
     {
         return new MessageHandle($this, $message);
+    }
+
+    /**
+     * The broadcast channels: their names for a participant or a thread, and the opt-in
+     * channel authorisation callbacks.
+     */
+    public function channels(): ChannelsHandle
+    {
+        return new ChannelsHandle($this->container);
     }
 
     /**

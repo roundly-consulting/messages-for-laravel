@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\Messages\Facades\Messages;
+use RoundlyConsulting\Messages\Tests\Fixtures\AuthorisingBroadcaster;
 use RoundlyConsulting\Messages\Tests\Fixtures\LatestMessageVectors;
 use RoundlyConsulting\Messages\Tests\Models\User;
 use RoundlyConsulting\Testing\Database\DriverMatrix;
@@ -118,3 +120,16 @@ it('resolves the latest message on uuid keys', function (callable $scenario): vo
 
     LatestMessageVectors::assertScenario($thread, $expected);
 })->with(LatestMessageVectors::scenarios());
+
+it('authorises a thread channel by its uuid key and refuses a malformed one', function (): void {
+    Broadcast::extend('authorising', static fn (): AuthorisingBroadcaster => new AuthorisingBroadcaster);
+    config()->set('broadcasting.default', 'authorising');
+    config()->set('broadcasting.connections.authorising', ['driver' => 'authorising']);
+    Messages::channels()->register();
+
+    $user = User::create();
+    $thread = Messages::start('Team')->withParticipants([$user])->create();
+
+    expect(Broadcast::connection()->allows($user, 'messaging.thread.'.$thread->getKey()))->toBeTrue()
+        ->and(Broadcast::connection()->allows($user, 'messaging.thread.123'))->toBeFalse();
+});

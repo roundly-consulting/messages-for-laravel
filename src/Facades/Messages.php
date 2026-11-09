@@ -12,6 +12,7 @@ use RoundlyConsulting\Messages\Builders\PendingThread;
 use RoundlyConsulting\Messages\DataTransferObjects\MessagingCall;
 use RoundlyConsulting\Messages\Enums\MessagingOperation;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
+use RoundlyConsulting\Messages\Handles\ChannelsHandle;
 use RoundlyConsulting\Messages\Handles\MessageHandle;
 use RoundlyConsulting\Messages\Handles\ThreadHandle;
 use RoundlyConsulting\Messages\MessagesManager;
@@ -31,6 +32,7 @@ use RoundlyConsulting\Messages\Testing\MessagesFake;
  * @method static LengthAwarePaginator<int, Thread> threads(?Model $for = null, int $perPage = 15, ?int $page = null, string $pageName = 'page')
  * @method static ThreadHandle thread(Thread $thread)
  * @method static MessageHandle message(Message $message)
+ * @method static ChannelsHandle channels()
  * @method static int prune(?int $days = null, ?Thread $thread = null)
  * @method static list<MessagingCall> recorded(?MessagingOperation $operation = null)
  * @method static void assertThreadCreated(?string $name = null)

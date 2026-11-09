@@ -6,6 +6,29 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 
 ## Unreleased
 
+### Added
+
+- A `{alias}` placeholder for `messages.broadcasting.threads.per-participant-channel`: the
+  participant's morph alias when its type is one, otherwise a 16-character hash of the type
+  (`messaging.participant.{alias}.{id}` → `private-messaging.participant.diner.5`). Two models
+  sharing a class basename get different channels, and no class name reaches the client.
+- `Messages::channels()`: `participant($model)` and `thread($thread)` return the channel names
+  the package broadcasts on (for the client to subscribe to), and the opt-in `register($guards)`
+  registers their authorisation callbacks — a thread channel admits the thread's current
+  participants, a participant channel only its own model.
+
+### Deprecated
+
+- The `{type}` placeholder of `messages.broadcasting.threads.per-participant-channel`: it puts the
+  participant's class name in a channel name the client sees. Use `{alias}`.
+
+### Planned for the next major
+
+- `messages.broadcasting.threads.per-participant-channel` defaults to
+  `messaging.participant.{alias}.{id}` (today `messaging.participant.{name}.{id}`, which two
+  classes sharing a basename share), and the `{type}` placeholder is removed. Clients subscribe to
+  the name `Messages::channels()->participant($user)` returns.
+
 ## 2.0.0 - 2026-11-07
 
 ### Changed
