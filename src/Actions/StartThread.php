@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Actions;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Messages\DataTransferObjects\AddParticipantData;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\Events\ThreadCreated;
 use RoundlyConsulting\Messages\Exceptions\ParticipationException;
+use RoundlyConsulting\Messages\Exceptions\ThreadContextException;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadContext;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
@@ -18,10 +21,18 @@ final class StartThread
 {
     public function __construct(
         private readonly AddParticipant $addParticipant,
+        private readonly ThreadContext $threadContext,
     ) {}
 
+    /**
+     * @throws ThreadContextException when the context is unsaved, or another than the current one
+     */
     public function execute(CreateThreadData $data): Thread
     {
+        // Explicit, else the fail-closed hook's current one — a thread started outside the
+        // current context could never be found again.
+        $context = $this->threadContext->forNewThread($data->context);
+
         $isPublic = $data->isDirect
             ? false
             : ($data->isPublic ?? Config::boolean('messages.publicity.public-by-default'));
@@ -37,8 +48,10 @@ final class StartThread
             'is_public' => $isPublic,
             'everyone_can_join' => $everyoneCanJoin,
             'is_direct' => $data->isDirect,
-            'direct_key' => $data->isDirect ? ($data->directKey ?? $this->pairKey($data)) : null,
+            'direct_key' => $data->isDirect ? ($data->directKey ?? $this->pairKey($data, $context)) : null,
             'last_activity_at' => now(),
+            'context_type' => $context?->getMorphClass(),
+            'context_id' => $context?->getKey(),
         ]);
 
         // The thread and its participants land together, and nobody hears about the thread
@@ -76,11 +89,12 @@ final class StartThread
      * `start()->direct()->withParticipants()`), so it is the pair's one DM exactly like
      * `Messages::direct()`'s: a second DM for the pair is refused by the unique index instead of
      * becoming an unkeyed duplicate. One distinct participant is a note-to-self; none leaves the
-     * thread unkeyed; more than two is not a direct thread.
+     * thread unkeyed; more than two is not a direct thread. In a context the key carries it, so
+     * the pair holds one DM per context.
      *
      * @throws ParticipationException for more than two distinct participants
      */
-    private function pairKey(CreateThreadData $data): ?string
+    private function pairKey(CreateThreadData $data, ?Model $context): ?string
     {
         $sides = [];
 
@@ -92,8 +106,8 @@ final class StartThread
 
         return match (count($sides)) {
             0 => null,
-            1 => ThreadModel::class()::directKeyFor($sides[0], $sides[0]),
-            2 => ThreadModel::class()::directKeyFor($sides[0], $sides[1]),
+            1 => ThreadModel::class()::directKeyFor($sides[0], $sides[0], $context),
+            2 => ThreadModel::class()::directKeyFor($sides[0], $sides[1], $context),
             default => throw ParticipationException::directThreadTakesTwo(),
         };
     }

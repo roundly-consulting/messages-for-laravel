@@ -18,6 +18,10 @@ return new class extends Migration
         Schema::create('restaurants', fn (Blueprint $table) => $table->id());
         Schema::create('companies', fn (Blueprint $table) => $table->id());
         Schema::create('notifiable_users', fn (Blueprint $table) => $table->id());
+        // ULID-keyed stand-ins for a host that keys everything with ULIDs (the thread context
+        // and its participants on the `messages.key_type = ulid` leg).
+        Schema::create('ulid_users', fn (Blueprint $table) => $table->ulid('id')->primary());
+        Schema::create('ulid_companies', fn (Blueprint $table) => $table->ulid('id')->primary());
         Schema::create('people', function (Blueprint $table): void {
             $table->id();
             $table->string('name')->nullable();

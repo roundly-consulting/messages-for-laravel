@@ -18,6 +18,9 @@ final readonly class CreateThreadData
      *                                  {@see FindOrCreateDirectThread}; when null, a direct thread
      *                                  of one or two participants is keyed from them. Ignored on
      *                                  group threads.
+     * @param  Model|null  $context  The model the thread belongs to (a company, a project). Null
+     *                               starts it in the current context of the fail-closed hook,
+     *                               or in none.
      */
     public function __construct(
         public ?string $name = null,
@@ -26,5 +29,6 @@ final readonly class CreateThreadData
         public bool $isDirect = false,
         public array $participants = [],
         public ?string $directKey = null,
+        public ?Model $context = null,
     ) {}
 }

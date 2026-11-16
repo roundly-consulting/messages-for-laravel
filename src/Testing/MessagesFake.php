@@ -69,18 +69,22 @@ final class MessagesFake extends MessagesManager
     }
 
     /**
-     * A thread was created — by `start()->create()`, or by a `direct()` that found none.
+     * A thread was created — by `start()->create()`, or by a `direct()` that found none —
+     * optionally with that name and in that context (the context it was created in, whether
+     * asked for with `for()` or taken from the fail-closed hook).
      */
-    public function assertThreadCreated(?string $name = null): void
+    public function assertThreadCreated(?string $name = null, ?Model $context = null): void
     {
         $created = array_filter(
             $this->created(),
-            static fn (Thread $thread): bool => $name === null || $thread->name === $name,
+            static fn (Thread $thread): bool => ($name === null || $thread->name === $name)
+                && ($context === null || $thread->isInContext($context)),
         );
 
-        Assert::assertNotEmpty($created, $name === null
-            ? 'Expected a thread to be created, but none was.'
-            : "Expected a thread named [{$name}] to be created, but none was.");
+        $what = $name === null ? 'a thread' : "a thread named [{$name}]";
+        $where = $context === null ? '' : sprintf(' in context [%s:%s]', class_basename($context), (string) $context->getKey());
+
+        Assert::assertNotEmpty($created, "Expected {$what} to be created{$where}, but none was.");
     }
 
     public function assertNothingCreated(): void

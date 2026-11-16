@@ -48,6 +48,13 @@ return [
         'participant-in-another-thread' => 'Participant [:participant] belongs to another thread.',
     ],
 
+    'context' => [
+        'outside-current' => 'Thread [:thread] belongs to another context.',
+        'mismatch' => 'A thread can only be started in the current context.',
+        'unsaved' => 'A thread context must be a saved model.',
+        'invalid-resolution' => 'The thread context resolver must return a model or null, [:given] given.',
+    ],
+
     'reply' => [
         'cross-thread' => 'A reply must target a message in the same thread.',
     ],

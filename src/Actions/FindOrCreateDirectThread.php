@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Actions;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use RoundlyConsulting\Messages\DataTransferObjects\CreateThreadData;
+use RoundlyConsulting\Messages\Exceptions\ThreadContextException;
 use RoundlyConsulting\Messages\Models\Thread;
+use RoundlyConsulting\Messages\Support\ThreadContext;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 
 /**
@@ -17,6 +20,9 @@ use RoundlyConsulting\Messages\Support\ThreadModel;
  * lookup and both insert. So the DM carries its pair key ({@see Thread::directKeyFor()}) in a
  * unique column, and the database refuses the second insert; the loser looks again and returns
  * the winner's thread.
+ *
+ * In a context the pair has one DM per context: the lookup is limited to that context and the
+ * key carries it, so a DM in context A is never returned for context B — nor for no context.
  */
 final class FindOrCreateDirectThread
 {
@@ -25,16 +31,25 @@ final class FindOrCreateDirectThread
 
     public function __construct(
         private readonly StartThread $startThread,
+        private readonly ThreadContext $threadContext,
     ) {}
 
-    public function execute(Model $first, Model $second): Thread
+    /**
+     * @param  Model|null  $context  the context the DM belongs to; null = the fail-closed hook's
+     *                               current context, or none
+     *
+     * @throws ThreadContextException when the context is unsaved, or another than the current one
+     */
+    public function execute(Model $first, Model $second, ?Model $context = null): Thread
     {
+        $context = $this->threadContext->forNewThread($context);
+
         $model = ThreadModel::class();
-        $key = $model::directKeyFor($first, $second);
+        $key = $model::directKeyFor($first, $second, $context);
 
         for ($attempt = 1; ; $attempt++) {
             // Oldest first: should a pair ever hold two DMs, every lookup returns the same one.
-            $existing = $model::query()->between($first, $second)->orderBy('id')->first();
+            $existing = $this->between($first, $second, $context)->orderBy('id')->first();
 
             if ($existing instanceof Thread) {
                 return $existing;
@@ -45,13 +60,14 @@ final class FindOrCreateDirectThread
                     isDirect: true,
                     participants: [$first, $second],
                     directKey: $key,
+                    context: $context,
                 ));
             } catch (UniqueConstraintViolationException $exception) {
                 if ($attempt >= self::ATTEMPTS) {
                     throw $exception;
                 }
 
-                $this->releaseStaleKey($key, $first, $second);
+                $this->releaseStaleKey($key, $first, $second, $context);
             }
         }
     }
@@ -63,13 +79,13 @@ final class FindOrCreateDirectThread
      * fresh one. The release names that exact holder, so it can never strip the key from a
      * thread a concurrent request has just created.
      */
-    private function releaseStaleKey(string $key, Model $first, Model $second): void
+    private function releaseStaleKey(string $key, Model $first, Model $second, ?Model $context): void
     {
         $model = ThreadModel::class();
 
         $holder = $model::query()->withTrashed()->where('direct_key', $key)->value('id');
 
-        if ($holder === null || $model::query()->between($first, $second)->whereKey($holder)->exists()) {
+        if ($holder === null || $this->between($first, $second, $context)->whereKey($holder)->exists()) {
             return;
         }
 
@@ -80,5 +96,17 @@ final class FindOrCreateDirectThread
             ->where('direct_key', $key)
             ->toBase()
             ->update(['direct_key' => null]);
+    }
+
+    /**
+     * The pair's DMs in exactly this context — or, given none, without one.
+     *
+     * @return Builder<Thread>
+     */
+    private function between(Model $first, Model $second, ?Model $context): Builder
+    {
+        $query = ThreadModel::class()::query()->between($first, $second);
+
+        return $context === null ? $query->withoutContext() : $query->forContext($context);
     }
 }

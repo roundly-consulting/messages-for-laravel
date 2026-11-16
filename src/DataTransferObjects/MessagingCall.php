@@ -20,6 +20,7 @@ use RoundlyConsulting\Messages\Models\Thread;
  * - `actor` — who performed it (`by:`), the outgoing owner of a transfer, the first side of a
  *   direct thread.
  * - `text` — a thread name or a message body.
+ * - `context` — the context a thread was asked to start in (`start()->for()`, `direct()`).
  */
 final readonly class MessagingCall
 {
@@ -33,6 +34,7 @@ final readonly class MessagingCall
         public ?ParticipantRole $role = null,
         public ?int $days = null,
         public mixed $result = null,
+        public ?Model $context = null,
     ) {}
 
     public function withResult(mixed $result): self
@@ -47,6 +49,7 @@ final readonly class MessagingCall
             role: $this->role,
             days: $this->days,
             result: $result,
+            context: $this->context,
         );
     }
 }

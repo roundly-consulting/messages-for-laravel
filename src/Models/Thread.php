@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection as SupportCollection;
 use RoundlyConsulting\Messages\Concerns\HasConfigurableKey;
+use RoundlyConsulting\Messages\Concerns\HasThreadContext;
 use RoundlyConsulting\Messages\Database\Factories\ThreadFactory;
 use RoundlyConsulting\Messages\Enums\ParticipantRole;
 use RoundlyConsulting\Messages\MessagesManager;
@@ -26,6 +27,7 @@ use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\MessagingPermissions;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
+use RoundlyConsulting\Messages\Support\ThreadContext;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 
 /**
@@ -37,6 +39,8 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
  * @property bool $everyone_can_join
  * @property CarbonInterface $last_activity_at
  * @property int|string|null $last_message_id
+ * @property string|null $context_type
+ * @property int|string|null $context_id
  * @property CarbonInterface|null $archived_at
  * @property CarbonInterface $created_at
  * @property CarbonInterface|null $updated_at
@@ -45,6 +49,7 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
  * @property-read Collection<int, Participant> $participants
  * @property-read Collection<int, Message> $messages
  * @property-read Message|null $latestMessage
+ * @property-read Model|null $context
  *
  * Not final: `messages.models.thread` documents swapping in a host subclass.
  */
@@ -56,6 +61,7 @@ class Thread extends Model
     /** @use HasFactory<ThreadFactory> */
     use HasFactory;
 
+    use HasThreadContext;
     use SoftDeletes;
 
     protected $table = 'messaging_threads';
@@ -122,7 +128,8 @@ class Thread extends Model
     }
 
     /**
-     * Direct threads whose participant set is exactly the two given models.
+     * Direct threads whose participant set is exactly the two given models, in any context —
+     * chain `forContext()` / `withoutContext()` to narrow it (`Messages::direct()` does).
      *
      * @param  Builder<Thread>  $query
      * @return Builder<Thread>
@@ -147,8 +154,11 @@ class Thread extends Model
      * first. Each side is `{length}:{morph type}:{key}`; the length prefix keeps the encoding
      * unambiguous whatever characters a morph alias holds, and the sides are sorted so the
      * pair has one spelling.
+     *
+     * In a context the key also carries the context (as a `c:`-prefixed digest), so the same
+     * pair holds one DM per context: a DM in context A is never reused for context B.
      */
-    public static function directKeyFor(Model $first, Model $second): string
+    public static function directKeyFor(Model $first, Model $second, ?Model $context = null): string
     {
         $sides = array_map(
             static fn (Model $side): string => strlen($side->getMorphClass()).':'.$side->getMorphClass().':'.(string) $side->getKey(),
@@ -157,7 +167,9 @@ class Thread extends Model
 
         sort($sides);
 
-        return implode('|', $sides);
+        $key = implode('|', $sides);
+
+        return $context === null ? $key : ThreadContext::directKey($key, ThreadContext::saved($context));
     }
 
     /**

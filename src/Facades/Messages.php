@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Facades;
 
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Facade;
@@ -24,18 +25,21 @@ use RoundlyConsulting\Messages\Testing\MessagesFake;
 /**
  * @method static PendingThread start(?string $name = null)
  * @method static PendingMessage to(Thread $thread)
- * @method static Thread direct(Model $first, Model $second)
+ * @method static Thread direct(Model $first, Model $second, ?Model $context = null)
  * @method static Message send(Thread $thread, ?Model $sender, string $body)
  * @method static Participant markRead(Thread $thread, Model $participant)
- * @method static int unreadCount(Model $participant, ?Thread $thread = null)
- * @method static LengthAwarePaginator<int, Thread> inboxFor(Model $participant, int $perPage = 15, ?int $page = null, string $pageName = 'page')
- * @method static LengthAwarePaginator<int, Thread> threads(?Model $for = null, int $perPage = 15, ?int $page = null, string $pageName = 'page')
+ * @method static int unreadCount(Model $participant, ?Thread $thread = null, ?Model $context = null)
+ * @method static LengthAwarePaginator<int, Thread> inboxFor(Model $participant, int $perPage = 15, ?int $page = null, string $pageName = 'page', ?Model $context = null)
+ * @method static LengthAwarePaginator<int, Thread> threads(?Model $for = null, int $perPage = 15, ?int $page = null, string $pageName = 'page', ?Model $context = null)
  * @method static ThreadHandle thread(Thread $thread)
  * @method static MessageHandle message(Message $message)
  * @method static ChannelsHandle channels()
  * @method static int prune(?int $days = null, ?Thread $thread = null)
+ * @method static void resolveContextUsing(?Closure $resolver)
+ * @method static Model|null currentContext()
+ * @method static mixed withoutContextScope(Closure $callback)
  * @method static list<MessagingCall> recorded(?MessagingOperation $operation = null)
- * @method static void assertThreadCreated(?string $name = null)
+ * @method static void assertThreadCreated(?string $name = null, ?Model $context = null)
  * @method static void assertNothingCreated()
  * @method static void assertSent(?string $body = null, ?Thread $to = null)
  * @method static void assertSentCount(int $count)

@@ -27,6 +27,8 @@ final class PendingThread
     /** @var list<Model> */
     private array $participants = [];
 
+    private ?Model $context = null;
+
     public function __construct(
         private readonly MessagesManager $manager,
         private ?string $name = null,
@@ -77,6 +79,17 @@ final class PendingThread
         return $this;
     }
 
+    /**
+     * Start the thread in a context — the company, project or order it belongs to. Left out,
+     * the thread starts in the fail-closed hook's current context, or in none.
+     */
+    public function for(Model $context): self
+    {
+        $this->context = $context;
+
+        return $this;
+    }
+
     public function withParticipant(Model $participant): self
     {
         $this->participants[] = $participant;
@@ -92,10 +105,11 @@ final class PendingThread
             everyoneCanJoin: $this->everyoneCanJoin,
             isDirect: $this->isDirect,
             participants: $this->participants,
+            context: $this->context,
         );
 
         return $this->manager->perform(
-            new MessagingCall(MessagingOperation::Start, text: $this->name),
+            new MessagingCall(MessagingOperation::Start, text: $this->name, context: $this->context),
             StartThread::class,
             static fn (StartThread $action): Thread => $action->execute($data),
         );

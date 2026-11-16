@@ -13,6 +13,7 @@ use RoundlyConsulting\Messages\Listeners\WarmMessageMediaVariants;
 use RoundlyConsulting\Messages\Support\MessageModel;
 use RoundlyConsulting\Messages\Support\MessagesConfig;
 use RoundlyConsulting\Messages\Support\ParticipantModel;
+use RoundlyConsulting\Messages\Support\ThreadContext;
 use RoundlyConsulting\Messages\Support\ThreadModel;
 use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
@@ -71,6 +72,7 @@ final class MessagesServiceProvider extends PackageServiceProvider
                 // to see it without reading a migration.
                 'Key type' => KeyType::fromConfig('messages.primary_key_type')->value,
                 'New threads' => self::publicity(),
+                'Context scope' => self::orInvalid(static fn (): string => app(ThreadContext::class)->isConfigured() ? 'ON' : 'OFF'),
                 'Roles' => Config::boolean('messages.permissions.enabled', true) ? 'ENFORCED' : 'OFF',
                 'System messages' => Config::boolean('messages.system-messages.enabled') ? 'ON' : 'OFF',
                 'Notifications' => self::notifications(),
@@ -99,6 +101,10 @@ final class MessagesServiceProvider extends PackageServiceProvider
         parent::register();
 
         $this->app->singleton(MessagesManager::class);
+
+        // One hook per application: the resolver set in a service provider is the one every
+        // thread query reads, and `Messages::fake()` (a new manager) keeps it.
+        $this->app->singleton(ThreadContext::class);
     }
 
     public function boot(): void

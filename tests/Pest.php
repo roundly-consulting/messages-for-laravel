@@ -5,6 +5,7 @@ declare(strict_types=1);
 use RoundlyConsulting\Messages\Testing\MessageExpectations;
 use RoundlyConsulting\Messages\Tests\Fixtures\MorphUuidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\SwappedModelsTestCase;
+use RoundlyConsulting\Messages\Tests\Fixtures\UlidEverywhereTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\UlidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\Fixtures\UuidKeyTestCase;
 use RoundlyConsulting\Messages\Tests\TestCase;
@@ -64,5 +65,11 @@ uses(UlidKeyTestCase::class)->in(__DIR__.'/KeyTypes/UlidKeyTest.php');
  * `primary_key_type` at its bigint default) to prove the two key types are independent.
  */
 uses(MorphUuidKeyTestCase::class)->in(__DIR__.'/KeyTypes/MorphKeyTypeTest.php');
+
+/**
+ * ULID on both axes — a host keyed with ULIDs everywhere — for the thread context's outbound
+ * morph key.
+ */
+uses(UlidEverywhereTestCase::class)->in(__DIR__.'/KeyTypes/UlidContextTest.php');
 
 MessageExpectations::register();

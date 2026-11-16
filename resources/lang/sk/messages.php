@@ -48,6 +48,13 @@ return [
         'participant-in-another-thread' => 'Účastník [:participant] patrí do inej konverzácie.',
     ],
 
+    'context' => [
+        'outside-current' => 'Konverzácia [:thread] patrí do iného kontextu.',
+        'mismatch' => 'Konverzáciu je možné začať iba v aktuálnom kontexte.',
+        'unsaved' => 'Kontext konverzácie musí byť uložený model.',
+        'invalid-resolution' => 'Resolver kontextu konverzácie musí vrátiť model alebo null, zadané [:given].',
+    ],
+
     'reply' => [
         'cross-thread' => 'Odpoveď musí smerovať na správu v tej istej konverzácii.',
     ],

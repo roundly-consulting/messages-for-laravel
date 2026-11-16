@@ -8,6 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Notifications\Notification;
 use ReflectionClass;
 use RoundlyConsulting\Messages\Http\Resources\MessageParticipantResource;
+use RoundlyConsulting\Messages\Http\Resources\ThreadContextResource;
+use RoundlyConsulting\Messages\Interfaces\ResolvesThreadContext;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
 use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\PackageToolkit\Support\Config;
@@ -158,6 +160,47 @@ final class MessagesConfig
 
         if (! is_string($class) || ! is_subclass_of($class, JsonResource::class) || (new ReflectionClass($class))->isAbstract()) {
             throw InvalidConfigurationException::notAnImplementation($key, JsonResource::class, $class);
+        }
+
+        return $class;
+    }
+
+    /**
+     * The resource a thread's context model renders through (`context` in ThreadResource): a
+     * concrete JsonResource subclass, refused like the participant resource otherwise.
+     *
+     * @return class-string<JsonResource>
+     */
+    public static function contextResource(): string
+    {
+        $key = 'messages.resources.context';
+        $class = self::unlessBlank(config($key)) ?? ThreadContextResource::class;
+
+        if (! is_string($class) || ! is_subclass_of($class, JsonResource::class) || (new ReflectionClass($class))->isAbstract()) {
+            throw InvalidConfigurationException::notAnImplementation($key, JsonResource::class, $class);
+        }
+
+        return $class;
+    }
+
+    /**
+     * The fail-closed context resolver class, or null when the hook is off. Anything set that
+     * is not a {@see ResolvesThreadContext} implementation throws — a typo must never quietly
+     * switch tenant isolation off.
+     *
+     * @return class-string<ResolvesThreadContext>|null
+     */
+    public static function contextResolver(): ?string
+    {
+        $key = 'messages.context.resolver';
+        $class = self::unlessBlank(config($key));
+
+        if ($class === null) {
+            return null;
+        }
+
+        if (! is_string($class) || ! is_subclass_of($class, ResolvesThreadContext::class)) {
+            throw InvalidConfigurationException::notAnImplementation($key, ResolvesThreadContext::class, $class);
         }
 
         return $class;

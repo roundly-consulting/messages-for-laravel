@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Messages\Http\Resources;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use RoundlyConsulting\Messages\Models\Thread;
@@ -31,6 +32,12 @@ final class ThreadResource extends JsonResource
             ),
             'latest_message' => MessageResource::make($this->whenLoaded('latestMessage')),
             'participants' => ParticipantResource::collection($this->whenLoaded('participants')),
+            // Only when the `context` relation is loaded (`$thread->load('context')`): its key and
+            // class basename by default, swappable via `messages.resources.context`.
+            'context' => $this->whenLoaded(
+                'context',
+                static fn (Model $context): ?array => ThreadContextResource::configured($context)?->resolve($request),
+            ),
         ];
     }
 }

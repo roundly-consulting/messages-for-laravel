@@ -8,6 +8,7 @@ use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
 use RoundlyConsulting\Messages\Notifications\NewMessageNotification;
 use RoundlyConsulting\Messages\Support\BroadcastChannels;
+use RoundlyConsulting\Messages\Support\ThreadContext;
 use RoundlyConsulting\Testing\Arch\ArchPresets;
 
 /**
@@ -57,8 +58,10 @@ ArchPresets::swappableModelsAreNotFinal([
  *
  * BroadcastChannels is exempt: its `{alias}` channel segment is a SHA-256 prefix of a morph type
  * — a stable, public identifier that keeps the class name out of the channel, not a secret.
+ * ThreadContext is exempt for the same reason: a contexted DM's `direct_key` is a SHA-256 of the
+ * pair and the context — a fixed-length uniqueness fingerprint of public identifiers, not a secret.
  */
-ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Messages', ignoring: [BroadcastChannels::class]);
+ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Messages', ignoring: [BroadcastChannels::class, ThreadContext::class]);
 
 /**
  * All three `messages.models.*` keys resolve through the Support seam

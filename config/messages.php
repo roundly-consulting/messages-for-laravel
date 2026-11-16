@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Messages\Http\Resources\MessageParticipantResource;
+use RoundlyConsulting\Messages\Http\Resources\ThreadContextResource;
 use RoundlyConsulting\Messages\Models\Message;
 use RoundlyConsulting\Messages\Models\Participant;
 use RoundlyConsulting\Messages\Models\Thread;
@@ -34,6 +35,34 @@ return [
 
     'resources' => [
         'participant' => MessageParticipantResource::class,
+
+        // How a thread's context model renders — `context` in ThreadResource, when the
+        // `context` relation is loaded. The default renders its key and class basename
+        // ({"id": 7, "type": "Company"}), never a class name. Same rules as "participant".
+        'context' => ThreadContextResource::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Thread Context
+    |--------------------------------------------------------------------------
+    |
+    | A thread may belong to a context: a company, a project, an order — any
+    | model (`Messages::start()->for($company)`, `Messages::direct($a, $b, $company)`).
+    | Its key type follows "key_type" below.
+    |
+    | "resolver" is the optional fail-closed hook: a class implementing
+    | ResolvesThreadContext, resolved from the container. While it returns a
+    | context, every thread query is limited to exactly that context — a thread
+    | of another context (or of none) is never found, and the Messages API
+    | refuses one it is handed. null switches the hook off. A closure set with
+    | Messages::resolveContextUsing() takes precedence. A value that is not a
+    | ResolvesThreadContext class throws an InvalidConfigurationException.
+    |
+    */
+
+    'context' => [
+        'resolver' => null,
     ],
 
     /*
@@ -42,8 +71,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | The primary-key strategy of the models this package points *at* polymorphically:
-    | the message sender and the thread participant. It sets the column type of the
-    | sender / participant morph keys and must match those models' primary key:
+    | the message sender, the thread participant and the thread context. It sets the
+    | column type of the sender / participant / context morph keys and must match those
+    | models' primary key:
     | "bigint" (the Laravel default), "uuid" or "ulid". Anything else throws an
     | InvalidConfigurationException.
     |
