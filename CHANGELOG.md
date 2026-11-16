@@ -4,6 +4,47 @@ All notable changes to `messages-for-laravel` are documented in this file. The f
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## 2.2.0 - 2026-11-16
+
+### Added
+
+- An optional polymorphic thread **context** — the company, project or order a conversation
+  belongs to: nullable, indexed `messaging_threads.context_type` / `context_id` (the key follows
+  `messages.key_type`), the `Thread::context()` relation and `Thread::isInContext(?Model)`.
+- `Messages::start()->for($context)` starts a thread in a context; `CreateThreadData::$context`.
+- `Messages::direct($a, $b, $context)` / `$user->conversationWith($other, $context)`: one direct
+  thread per pair **per context** — a DM in context A is never reused for context B or for none.
+  `Thread::directKeyFor($a, $b, $context)` carries the context in the unique pair key.
+- Query scopes `Thread::forContext($model)` and `Thread::withoutContext()`.
+- A `$context` argument on the listing and lookup helpers: `Messages::inboxFor(…, context:)`,
+  `Messages::threads(…, context:)`, `Messages::unreadCount($p, context:)`, and on `HasMessaging`'s
+  `threads()`, `conversations()`, `unreadThreads()`, `unreadCount()` and
+  `startConversationWith(…, context:)`.
+- A fail-closed context hook: `Messages::resolveContextUsing(fn () => $currentCompany)` or the
+  `messages.context.resolver` config key (a `ResolvesThreadContext` class). While it returns a
+  context, every thread query is limited to exactly that context (the `ThreadContextScope` global
+  scope) — another context's thread, or one without a context, is never found — and the API refuses
+  a thread of another context it is handed (`ThreadContextException`); new threads start in the
+  current context. `Messages::currentContext()` and `Messages::withoutContextScope(fn () => …)`.
+- `ThreadResource` renders `context` (when the relation is loaded) through the new swappable
+  `messages.resources.context` resource, default `ThreadContextResource`: `{"id", "type": class
+  basename}` — never a class name. The published `ThreadResource` stub renders it too.
+- `MessagesFake::assertThreadCreated(?string $name = null, ?Model $context = null)` and
+  `MessagingCall::$context`.
+- New `messages::messages.context.*` translations (en, sk); `Context scope` in `php artisan about`.
+
+### Changed
+
+- `Messages::direct()` without a context now finds only the pair's context-less DM (or, with the
+  hook on, the current context's). Nothing changes for an install that never sets a context.
+
+### Upgrade
+
+- Publish and run the new migration (`0012_update_messaging_threads_table_with_context`):
+  `php artisan vendor:publish --tag=messages-migrations` (already-published files are skipped),
+  then `php artisan migrate`. It only adds nullable columns and an index.
+- A context model's key type must match `messages.key_type` (the same rule as participants).
+
 ## 2.1.0 - 2026-11-09
 
 ### Added
